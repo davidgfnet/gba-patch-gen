@@ -1,0 +1,181 @@
+[
+  {
+    "game-code": "BLXP",
+    "game-version": 0,
+    "info-name": "Asterix & Obélix XXL",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x50114",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "game-code": "B2AP",
+    "game-version": 0,
+    "info-name": "2in1: Asterix & Obélix XXL + Bash Them All",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x853414",
+            "inst-patchv": "0x24000206"
+          },
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x8503f0",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "game-code": "AVRP",
+    "game-version": 0,
+    "info-name": "V-Rally 3 (Europe)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x23c",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "game-code": "AVRJ",
+    "game-version": 0,
+    "info-name": "V-Rally 3 (Japan)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x23c",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "game-code": "AVRE",
+    "game-version": 0,
+    "info-name": "V-Rally 3 (USA)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x23c",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "game-code": "B3RP",
+    "game-version": 0,
+    "info-name": "Driv3r (Europe)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x1e4",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "game-code": "B3RE",
+    "game-version": 0,
+    "info-name": "Driv3r (USA)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x1e4",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "game-code": "AUXP",
+    "game-version": 0,
+    "info-name": "Stuntman (Europe)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x270",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "game-code": "AUXE",
+    "game-version": 0,
+    "info-name": "Stuntman (USA)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x270",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "game-code": "BCSP",
+    "game-version": 0,
+    "info-name": "2in1: V-Rally 3 + Stuntman",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x270",
+            "inst-patchv": "0x24000206"
+          },
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x6ac",
+            "inst-patchv": "0x24000206"
+          },
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x40023c",
+            "inst-patchv": "0x24000206"
+          }
+        ]
+      }
+    }
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "game-code": "AZBJ",
+    "game-version": 0,
+    "info-name": "Bass Tsuri Shiyouze! - Tournament wa Senryaku da!",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "str16-thumb",
+            "inst-offset": "0x23a"
+          },
+          {
+            "inst-type":   "str16-thumb",
+            "inst-offset": "0x23c"
+          }
+        ]
+      }
+    }
+  }
+]
