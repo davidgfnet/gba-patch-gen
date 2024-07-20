@@ -861,7 +861,6 @@ da101d63777c3fcd7947d6c8049180cb0ed1b0d15f9981073bd0fc3d64fcbddb  Extreme Skate 
 0d2babf0ecce7f12ea0cfc4b812f2f9d44774b2d6dc7654b565fc00376829f95  EZ-Talk - Shokyuu Hen 4 (Japan).gba
 cc236e75ba72f81e79946ba071882904cf7341731796414fbe2c2f0d938f6a25  EZ-Talk - Shokyuu Hen 5 (Japan).gba
 d699d59104dac11e07556fb91998c03003b89ec6389f79f7dd6ec99975a36f25  EZ-Talk - Shokyuu Hen 6 (Japan).gba
-cda55a896fbb2dc741718854b3554a7f53bf94301dbf6b7e7998d1697fd73ca0  f
 07af3699c8f68fa05a49842530441c46addcf9c42f576bd71187dc497cb2d027  F1 2002 (Europe) (En,Fr,De,Es,It).gba
 1443f0fc83144c9a1745abce8510c21a252cf6628f138b30cf8926f6196e7364  F1 2002 (USA, Europe).gba
 6dbbedbaffaba2f47498c084ea163963fa47a37e2b9065223084eea3da8343fd  F-14 Tomcat (USA, Europe).gba
@@ -929,10 +928,6 @@ f5267e8cb79c1ff2237c98e891cbd444d1e7a2cd444a9a60fb81fee6af9aa18a  FIFA Soccer 20
 affcf268f0c3dd0b4fb021e2a30a01b6cee73dac333a2f263ff2d18b58baf466  FIFA Soccer 2005 (USA, Europe) (En,Fr,De,Es,It,Nl).gba
 7eb9cef6343d24a159aa506d1efbbf631610409741ebc975db6449493936164b  FightBox (Europe).gba
 437cc4baa0819db43c71c3db6bd6331b057c82704af91bc9e5f98d012089695e  FILA Decathlon (Europe) (En,Fr,De,Es,It,Sv).gba
-13108def60e14c48f7e90efe4da0ed7d1ef5865e4593a8feb9540c66104fd6b6  files2.txt
-d37312d14079938a7f9cc9f2d3d46bc0cdab6347e80c3d24cd4aa9475ffcd080  files3.txt
-2b9022e29a7c2a3d5529e887dde590a9aa271f79b963b072ec3b98373d1f8aa8  files4.txt
-1bdced479c7d9b55810906d3b53c58d673aa158d95968b4bdc1392dd24232b1f  files.txt
 b654190a7e0292dab2a70bf2621559294718a7f19ec9ffc595f78ff21a40294a  Final Fantasy I, II Advance (Japan) (Rev 1).gba
 bc9c6a2436f2d71f55db638b1dcb9f3f81402616498b9fb8cfbd3a62ce87961f  Final Fantasy I, II Advance (Japan) (Rev 1) (Virtual Console).gba
 6d13e8c0be823b594d93e23179fb43324067790d53c9b9fd7bac9d89e99e7e00  Final Fantasy I & II - Dawn of Souls (Europe) (En,Fr,De,Es,It).gba
@@ -1527,7 +1522,6 @@ a0b05777123a277e0423cb49cf36976fd5511c1bfddd955ee8b19a504ddc77ef  Little Patissi
 bc3016fad89b5210c717f603b9b034350983c1ef251ab5b558af7668fed467e7  Lizzie McGuire (Europe) (En,Fr,De,Es).gba
 93cfa4114f57be0a0551d268258a4d3f9229d042c3f76ee07ebeeabf52a9178f  Lizzie McGuire - On the Go! (USA).gba
 fb0c784708af1d93f30b2e8063f16f7500d81e9a0edc56c983eff738e18f8de8  Lode Runner (Japan).gba
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  logcheck
 05be7940195ba5c2bf8bb767a9d9fa49f50f46f53333e7796ebe6c70e4a51673  Looney Tunes - Back in Action (USA, Europe) (En,Fr,De,Es,It).gba
 4fc95c75de8bee71920236a3866457a83dc94f033da359f1b4155d51528f0274  Looney Tunes Double Pack (Europe).gba
 8dc3f58ee5261bc525e26cf4035bfebe5f0de53505359e09068a204c10f6b82f  Looney Tunes Double Pack (USA).gba
@@ -2182,7 +2176,6 @@ e0224b8e57be4f80741d0362d343c62ef4c8b7a242c2d3928a715cbebaf8079a  Power Rangers 
 430cf63ae776e2cfcb6ed262f2180bc343679df6de6713ee930ef6793aaadd47  Power Rangers - Ninja Storm (USA).gba
 6b7dcc1f6d8633ed8ddad31dc075555633ee7c021f7482b67831749506ca0be6  Power Rangers S.P.D. (Europe) (En,Es,It).gba
 7206416ac936c00052b327d83e029ea5cdbbc912a4e744f87c2a54ab894b125a  Power Rangers S.P.D. (Europe) (En,Fr,De).gba
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  Power Rangers S.P.D. (Europe) (En,Fr,De).sav
 0dafe7de23468539f6dababaab631e776b991ebd0c8738bfb37f0886859af1f0  Power Rangers S.P.D. (USA, Europe).gba
 ca0f638af962aa95d9e0f5de9cfd0d73e728cfb474ceaa1e66b8e900fc195702  Power Rangers - Time Force (Germany).gba
 34de738b4486d7a539548048592e1f75b5577b18163a31ddba3e7667e33d1e0d  Power Rangers - Time Force (USA, Europe).gba
