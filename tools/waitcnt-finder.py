@@ -34,6 +34,8 @@ EMU_OFFSET_EX  =  512             # Some instructions after the pool value
 ROM_ADDR = 0x08000000
 EMU_STCK = 0x02008000             # Use some "reasonable" and plausible SP
 
+TGT_ADDR = 0x04000204
+
 # Four possible constants (4 bit rot + 8 bit constant)
 MOVINST = frozenset([0x03A00301, 0x03A00404, 0x03A00510, 0x03A00640])
 MOVMASK = 0x0FEF0FFF
@@ -79,7 +81,7 @@ def emulate_thumb_insts(start, end, rom):
   cpust = arm.CPUState(EMU_STCK - 128)
 
   subrom = clear_bad_seqs(rom[start:end])
-  ex = arm.InstExecutor(cpust)
+  ex = arm.InstExecutor(cpust, TGT_ADDR, TGT_ADDR, TGT_ADDR)
   for i in range(0, end - start, 2):
     op = struct.unpack("<H", subrom[i:i+2])[0]
     ex.addinst(arm.ThumbInst(ex, ROM_ADDR + start + i, op, readrom))
@@ -99,7 +101,7 @@ def emulate_arm_insts(start, end, rom):
   cpust = arm.CPUState(EMU_STCK - 128)
 
   subrom = clear_bad_seqs(rom[start:end])
-  ex = arm.InstExecutor(cpust)
+  ex = arm.InstExecutor(cpust, TGT_ADDR, TGT_ADDR, TGT_ADDR)
   for i in range(0, end - start, 4):
     op = struct.unpack("<I", subrom[i:i+4])[0]
     ex.addinst(arm.ARMInst(ex, ROM_ADDR + start + i, op, readrom))

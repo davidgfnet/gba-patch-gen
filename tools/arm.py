@@ -47,11 +47,14 @@ REG_PC = 15
 # When a resetting inst is met (usually BX) the path finishes there and
 # schedules an initial restart from the next PC.
 class InstExecutor(object):
-  def __init__(self, initial_state):
+  def __init__(self, initial_state, tgt_addr8=None, tgt_addr16=None, tgt_addr32=None):
     self._init_state = initial_state
     self._insts = []
     self._exec_queue = []
     self._entry_queue = [0]
+    self._tgt_addr32 = tgt_addr32
+    self._tgt_addr16 = tgt_addr16
+    self._tgt_addr8  = tgt_addr8
 
   def addinst(self, inst):
     self._insts.append(inst)
@@ -177,85 +180,113 @@ class ThumbInst(object):
     self._emu = lambda _ : None
     self._loadromcb = romcb        # ROM reading callback
     self.target_patch = False
+    self._dreg = None
 
     if (opcode >> 11) == 0:       # LSL
       self._emu = self._emu_shift_imm
+      self._dreg = self.rd()
       self._shf = lambda x, y: (x << y) & 0xFFFFFFFF
     elif (opcode >> 11) == 1:     # LSR
       self._emu = self._emu_shift_imm
+      self._dreg = self.rd()
       self._shf = lambda x, y: x >> y
     elif (opcode >> 11) == 2:     # ASR
       self._emu = self._emu_shift_imm
+      self._dreg = self.rd()
       self._shf = asr32
 
     elif (opcode >> 9) == 0xC:     # Add rd, rs, rn
       self._emu = self._emu_op3
+      self._dreg = self.rd()
       self._op3 = lambda x, y: (x + y) & 0xFFFFFFFF
     elif (opcode >> 9) == 0xD:     # Sub rd, rs, rn
       self._emu = self._emu_op3
+      self._dreg = self.rd()
       self._op3 = lambda x, y: (x - y) & 0xFFFFFFFF
     elif (opcode >> 9) == 0xE:     # Add rd, rs, imm
       self._emu = self._emu_op2imm
+      self._dreg = self.rd()
       self._op3 = lambda x, y: (x + y) & 0xFFFFFFFF
     elif (opcode >> 9) == 0xF:     # Sub rd, rs, imm
       self._emu = self._emu_op2imm
+      self._dreg = self.rd()
       self._op3 = lambda x, y: (x - y) & 0xFFFFFFFF
 
     elif (opcode >> 11) == 0x4:     # MOV reg, imm8
       self._emu = self._emu_movimm8
+      self._dreg = self.rd8()
     elif (opcode >> 11) == 0x5:     # CMP reg, imm8
       self._emu = self._emu_cmpimm8
+      self._dreg = self.rd8()
     elif (opcode >> 11) == 0x6:     # ADD reg, imm8
       self._emu = self._emu_addimm8
+      self._dreg = self.rd8()
     elif (opcode >> 11) == 0x7:     # SUB reg, imm8
       self._emu = self._emu_subimm8
+      self._dreg = self.rd8()
 
     elif (opcode >> 8) == 0x44:     # ADDhi rd, rs
       self._emu = self._emu_addhi
+      self._dreg = self.rdhi()
     elif (opcode >> 8) == 0x45:     # CMPhi rd, rs
       self._emu = self._emu_cmphi
+      self._dreg = self.rdhi()
     elif (opcode >> 8) == 0x46:     # MOVhi rd, rs
       self._emu = self._emu_movhi
+      self._dreg = self.rdhi()
+
 
     elif (opcode >> 11) == 0x14:    # ADD reg, pc, imm
       self._emu = self._emu_addpc
+      self._dreg = self.rd8()
     elif (opcode >> 11) == 0x15:    # ADD reg, sp, imm
       self._emu = self._emu_addsp
+      self._dreg = self.rd8()
 
     elif (opcode >> 10) == 0x2C:    # ADD sp, +/- imm
       self._emu = self._emu_adjsp
+      self._dreg = REG_SP
 
 
     elif (opcode >> 11) == 9:      # LDR reg, [pc+imm]
       self._emu = self._emu_loadpcrel
+      self._dreg = self.rd8()
 
     elif (opcode >> 9) == 0x2B:    # LDSB rd, [rb+ro]
       self._emu = self._emu_ld2r
+      self._dreg = self.rd()
       self._load_cb = self._load_sbyte
     elif (opcode >> 9) == 0x2C:    # LDR rd, [rb+ro]
       self._emu = self._emu_ld2r
+      self._dreg = self.rd()
       self._load_cb = self._load_word
     elif (opcode >> 9) == 0x2D:    # LDRH rd, [rb+ro]
       self._emu = self._emu_ld2r
+      self._dreg = self.rd()
       self._load_cb = self._load_halfword
     elif (opcode >> 9) == 0x2E:    # LDRB rd, [rb+ro]
       self._emu = self._emu_ld2r
+      self._dreg = self.rd()
       self._load_cb = self._load_byte
     elif (opcode >> 9) == 0x2F:    # LDSH rd, [rb+ro]
       self._emu = self._emu_ld2r
+      self._dreg = self.rd()
       self._load_cb = self._load_shalfword
 
 
     elif (opcode >> 11) == 0xD:    # LDR rd, [rb+imm]
       self._emu = self._emu_ldimm
+      self._dreg = self.rd()
       self._imm = self.imm5() * 4
       self._load_cb = self._load_word
     elif (opcode >> 11) == 0xF:    # LDRB rd, [rb+imm]
       self._emu = self._emu_ldimm
+      self._dreg = self.rd()
       self._imm = self.imm5()
       self._load_cb = self._load_byte
     elif (opcode >> 11) == 0x11:   # LDRH rd, [rb+imm]
       self._emu = self._emu_ldimm
+      self._dreg = self.rd()
       self._imm = self.imm5() * 2
       self._load_cb = self._load_halfword
 
@@ -288,35 +319,45 @@ class ThumbInst(object):
       self._store_cb = self._store_word
     elif (opcode >> 11) == 0x13:    # LDR reg, [sp + imm]
       self._emu = self._emu_ldrsp
+      self._dreg = self.rd8()
       self._imm = self.imm8() * 4
       self._load_cb = self._load_word
 
     elif (opcode >> 6) == 0x100:     # AND rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: x & y
     elif (opcode >> 6) == 0x101:     # XOR rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: x ^ y
     elif (opcode >> 6) == 0x102:     # LSL rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: (x << y) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x103:     # LSR rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: (x >> y) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x104:     # ASR rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = asr32
     elif (opcode >> 6) == 0x105:     # ADC rd, rs
       self._emu = self._op2unk
+      self._dreg = self.rd()
     elif (opcode >> 6) == 0x106:     # SBC rd, rs
       self._emu = self._op2unk
+      self._dreg = self.rd()
     elif (opcode >> 6) == 0x107:     # ROR rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: ((x >> (y & 31)) | (x << (32 - (y & 31)))) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x108:     # TST rd, rs
       self._emu = self._op2nop
     elif (opcode >> 6) == 0x109:     # NEG rd, rs
       self._emu = self._op2unary
+      self._dreg = self.rd()
       self._op2 = lambda x: (~x + 1) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x10A:     # CMP rd, rs
       self._emu = self._op2nop
@@ -324,15 +365,19 @@ class ThumbInst(object):
       self._emu = self._op2nop
     elif (opcode >> 6) == 0x10C:     # ORR rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: x | y
     elif (opcode >> 6) == 0x10D:     # MUL rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: (x * y) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x10E:     # BIC rd, rs
       self._emu = self._op2bin
+      self._dreg = self.rd()
       self._op2 = lambda x, y: (x & (~y)) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x10F:     # MVN rd, rs
       self._emu = self._op2unary
+      self._dreg = self.rd()
       self._op2 = lambda x: (~x) & 0xFFFFFFFF
 
     elif (opcode >> 9) == 0x5A:     # PUSH reglist [+lr]
@@ -368,6 +413,9 @@ class ThumbInst(object):
 
   def execute(self, cpustate):
     return self._emu(cpustate)
+
+  def write_reg(self):
+    return self._dreg
 
   # Decoder
   def rd(self):  return self._opcode & 7
@@ -433,17 +481,17 @@ class ThumbInst(object):
     return val
 
   def _store_word(self, st, addr, value):
-    if addr == 0x04000204:   # Writing 206 as well seems common in some games
+    if addr == self._executor._tgt_addr32:   # Writing 206 as well seems common in some games
       self.target_patch = "str32"
     return st.store_word(addr, value)
 
   def _store_halfword(self, st, addr, value):
-    if addr == 0x04000204:
+    if addr == self._executor._tgt_addr16:
       self.target_patch = "str16"
     return st.store_halfword(addr, value)
 
   def _store_byte(self, st, addr, value):
-    if (addr & ~1) == 0x04000204:
+    if (addr & ~1) == self._executor._tgt_addr8:
       if not self._susp_memop:
         self.target_patch = "str8"
     return st.store_byte(addr, value)
@@ -664,6 +712,7 @@ class ARMInst(object):
     self._emu = lambda _ : None
     self._loadromcb = romcb
     self.target_patch = False
+    self._dreg = None
 
     self._cond = (opcode >> 28) & 0xF
 
@@ -864,6 +913,7 @@ class ARMInst(object):
           (self._regop_unary, lambda x : ~x), (self._regop_unary, lambda x : ~x),   # MVN
         ]
         self._emu, self._op = ops[op8]
+        self._dreg = self.rd()    # This is an aproximation really... (doesn't work for tst/cmp)
     elif op8 < 64:
       ops = [
           (self._immop, lambda x, y : x & y), (self._immop, lambda x, y : x & y),   # AND
@@ -887,6 +937,7 @@ class ARMInst(object):
           (self._immop_unary, lambda x : ~x), (self._immop_unary, lambda x : ~x),   # MVN
         ]
       self._emu, self._op = ops[op8 - 32]
+      self._dreg = self.rd()    # This is an aproximation
     elif op8 < 128:
       ops = [
           (self._store_word,      self._mimm12,       MEM_IDX_POST_WB),       # STR rd, [rn], -imm
@@ -961,7 +1012,12 @@ class ARMInst(object):
           (self._store_byte,      self._pregop,        MEM_IDX_PRE_WB),       # STRB rd, [rn + regop]!
           (self._load_byte,       self._pregop,        MEM_IDX_PRE_WB),       # LDRB rd, [rn + regop]!
       ]
-      self._emu = self._emu_ld if op8 & 1 else self._emu_st
+      if op8 & 1:
+        self._emu = self._emu_ld   # Load opcode
+        self._dreg = self.rd()
+      else:
+        self._emu = self._emu_st   # Store opcode
+
       self._memop, self._mem_op2, self._mem_bt = ops[op8 - 64]
 
     elif op8 < 160:
@@ -1012,6 +1068,9 @@ class ARMInst(object):
     else:
       self._emu = self._reset_swi
 
+  def write_reg(self):
+    return self._dreg
+
   def execute(self, cpustate):
     cpustate.regs[REG_PC] = self._pc  # Set PC value since ARM can easily read it
     return self._emu(cpustate)
@@ -1025,17 +1084,17 @@ class ARMInst(object):
 
   # Memops
   def _store_word(self, st, addr, value):
-    if addr == 0x04000204:
+    if addr == self._executor._tgt_addr32:
       self.target_patch = "str32"
     return st.store_word(addr, value)
 
   def _store_halfword(self, st, addr, value):
-    if addr == 0x04000204:
+    if addr == self._executor._tgt_addr16:
       self.target_patch = "str16"
     return st.store_halfword(addr, value)
 
   def _store_byte(self, st, addr, value):
-    if (addr & ~1) == 0x04000204:
+    if (addr & ~1) == self._executor._tgt_addr8:
       self.target_patch = "str8"
     return st.store_byte(addr, value)
 

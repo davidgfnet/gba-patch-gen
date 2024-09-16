@@ -6,7 +6,6 @@
 # Given a full unified patch set, generate raw patches in several formats:
 #  - JSON: For human inspection
 #  - Patch-Database: To use with SuperFW as loadable patch DB
-#  - C/C++ header: To be used as built-in database in SuperFW
 #  - Py: To manually and locally patch ROMs
 
 import sys, os, json, argparse, struct, re, string, time
@@ -14,7 +13,7 @@ import sys, os, json, argparse, struct, re, string, time
 parser = argparse.ArgumentParser(prog='patch_gen')
 parser.add_argument('--input', dest='inpatch', required=True, help='Input JSON file containing the patches')
 parser.add_argument('--outfile', dest='outfile', required=True, help='Output path in JSON format')
-parser.add_argument('--format', dest='format', required=True, help='Format: json, db, h or py')
+parser.add_argument('--format', dest='format', required=True, help='Format: json, db or py')
 parser.add_argument('--creator', dest='creator', type=str, default="unknown", help='Creator name (max 31 utf-8 bytes)')
 parser.add_argument('--creation-date', dest='cdate', type=str, default=None, help='Creation date in YYYYMMDD format (defaults to system time)')
 parser.add_argument('--version', dest='version', type=str, default="00000000", help='Version string (8 utf-8 bytes)')
@@ -81,6 +80,11 @@ def gen_cpywords(addr, words):
   assert len(words) <= 8 and len(words) > 0
   assert (addr & ~0x1FFFFFF) == 0
   return [ (OPC_COPY_WORD << 28) | ((len(words) - 1) << 25) | addr ] + words
+
+def gen_cpyhalfword(addr, halfw):
+  assert halfw <= 0xFFFF
+  assert (addr & ~0x1FFFFFF) == 0
+  return [ (OPC_COPY_BYTE << 28) | (1 << 25) | addr ] + [halfw]
 
 def gen_thumbnop(addr):
   assert (addr & ~0x1FFFFFF) == 0
@@ -169,9 +173,14 @@ FLASH_FLASH128_IDENT_PG = [
   0x4770,  # bx lr
 ]
 
+IRQ_POOL_ADDR_PATCH = [
+  0x03007FF4,   # Patches IRQ handler into unused memory address.
+]
+
 PROG_SWI1_EMU  = 0
 PROG_FLH64_ID  = 1
 PROG_FLH128_ID = 2
+PROG_IRQH_ADDR = 3
 
 PROGRAMS = [
   # 0: swi1-waitcnt preserving
@@ -180,6 +189,8 @@ PROGRAMS = [
   pack2(FLASH_FLASH64_IDENT_PG),
   # 2: flash128-ident
   pack2(FLASH_FLASH128_IDENT_PG),
+  # 3: irq-pool-patch (constant)
+  pack4(IRQ_POOL_ADDR_PATCH),
 ]
 
 # WaitCNT patching.
@@ -291,6 +302,53 @@ def gen_flash_patch(flash_info):
 
   return ret
 
+def gen_irqhdr_patch(irqhdr_psites):
+  ret = []
+
+  patch_pool = set()
+
+  for e in irqhdr_psites:
+    if e["inst-type"] == "mem-clr-seq":
+      # Usually involves patching some instruction.
+      ret += gen_cpywords(int(e["patch-addr"], 16), [int(e["patch-value"], 16)])
+    elif e["inst-type"] == "irq-arm-str":
+      # Usually patch the pool address, unless there is none.
+      if "pool-addr" in e:
+        patch_pool.add(int(e["pool-addr"], 16))
+      else:
+        opc = int(e["inst-opcode"], 16)
+        cond, op = opc >> 28, (opc >> 20) & 0xFF
+        assert op == 0x58   # TODO Support opcode 0x50
+        rn, rd, off = ((opc >> 16) & 0xF), ((opc >> 12) & 0xF), opc & 0xFFF
+        # We need to subtract 8 to the offset (so 0xFC becomes 0xF4). This might not be
+        # possible if the offset is zero, in that case we replace the opcode to 0x50.
+        newoff = off - 8
+        if newoff >= 0:
+          opc = (opc & 0xFFFFF000) | (newoff & 0xFFF)
+        else:
+          opc = (opc & 0xF00FF000) | (-newoff & 0xFFF) | (0x05000000)
+
+        ret += gen_cpywords(int(e["offset"], 16), [opc])
+    elif e["inst-type"] == "irq-thumb-str":
+      # Usually patch the pool address, unless there is none.
+      if "pool-addr" in e:
+        patch_pool.add(int(e["pool-addr"], 16))
+      else:
+        opc = int(e["inst-opcode"], 16)
+        op, imm5 = opc >> 11, (opc >> 6) & 0x1F
+        assert op == 0xC
+        # We only subtract 2 (since it's scaled by 4)
+        assert imm5 >= 2
+        opc = (opc & 0xF83F) | (((imm5 - 2) & 0x1F) << 6)
+
+        ret += gen_cpyhalfword(int(e["offset"], 16), opc)
+
+  # Patch pool addresses
+  for pooladdr in patch_pool:
+    ret += gen_prgwr(pooladdr, PROG_IRQH_ADDR)
+
+  return ret
+
 class GamePatch(object):
   def __init__(self, gamecode, gamever, targets, romsize):
     # Store patches in raw format
@@ -303,6 +361,7 @@ class GamePatch(object):
       targets.get("layout", {}).get("info", {}))
 
     self._save_patches = []
+    self._irq_patches = []
 
     if "eeprom" in targets:
       self._save_patches += gen_eeprom_patch(
@@ -311,20 +370,24 @@ class GamePatch(object):
     if "flash" in targets:
       self._save_patches += gen_flash_patch(targets["flash"])
 
+    if "irqhdr" in targets:
+      self._irq_patches += gen_irqhdr_patch(targets["irqhdr"].get("patch-sites", []))
+
     assert all((x & 0xFFFFFFFF) == x for x in self._waitcnt_patches)
     assert all((x & 0xFFFFFFFF) == x for x in self._save_patches)
 
     # we don't support more than this for now
-    assert ((len(self._waitcnt_patches)) // 4) < 256
-    assert ((len(self._save_patches)) // 4) < 256
+    assert (len(self._save_patches)) < 64          # Limit to 64, we use two MSB for flags
+    assert (len(self._waitcnt_patches)) < 256
+    assert (len(self._irq_patches)) < 256
 
     does_save = any(x in targets for x in ["eeprom", "sram", "flash"])
     uses_128k = targets.get("flash", {}).get("subtype", "").startswith("FLASH1M")
 
-    self._flags = ( (1 if does_save else 0) |
-                    (2 if uses_128k else 0))
+    self._save_flags = ( (0x80 if does_save else 0) |
+                         (0x40 if uses_128k else 0))
 
-    self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches)
+    self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches + self._irq_patches)
 
   def gamecode(self):
     return self._gamecode
@@ -332,12 +395,10 @@ class GamePatch(object):
   def gamecode_eu32(self):
     return struct.unpack("<I", self._gamecode.encode("ascii"))[0]
 
-  def header(self):
-    return (self._gamever | (len(self._waitcnt_patches) << 8) |
-            (len(self._save_patches) << 16) | (self._flags << 24))
-
   def dbheader(self):
-    return (len(self._waitcnt_patches) | (len(self._save_patches) << 8) | (self._flags << 24))
+    return (len(self._waitcnt_patches) |
+            ((len(self._save_patches) | self._save_flags) << 8) |
+            (len(self._irq_patches) << 16))
 
   def gamever(self):
     return self._gamever
@@ -350,6 +411,9 @@ class GamePatch(object):
 
   def save_patches(self):
     return self._save_patches
+
+  def irq_patches(self):
+    return self._irq_patches
 
   def size(self):
     return len(self._data)
@@ -380,13 +444,17 @@ for gcode in sorted(fpatches.keys()):
     "files": patches[gcode]["files"],
     "waitcnt-patches": ["0x%08x" % x for x in fpatches[gcode].waitcnt_patches()],
     "save-patches": ["0x%08x" % x for x in fpatches[gcode].save_patches()],
+    "irq-patches": ["0x%08x" % x for x in fpatches[gcode].irq_patches()],
   })
 
-maxpcnt = 0
-for gobj in fpatches.values():
-  maxpcnt = max(maxpcnt, len(gobj.waitcnt_patches()), len(gobj.save_patches()))
+maxsave = max([len(gobj.save_patches())    for gobj in fpatches.values()])
+maxwcnt = max([len(gobj.waitcnt_patches()) for gobj in fpatches.values()])
+maxirqh = max([len(gobj.irq_patches())     for gobj in fpatches.values()])
 
-print("Number of games:", len(fpatches), "| Maximum number of patches for a single game:", maxpcnt)
+maxpcnt = max([len(gobj.save_patches()) + len(gobj.waitcnt_patches()) + len(gobj.irq_patches())
+              for gobj in fpatches.values()])
+
+print("Number of games:", len(fpatches), "| Maximum patch count:", maxsave, "(save)", maxwcnt, "(waitcnt)", maxirqh, "(irqhdr)", maxpcnt, "(total)")
 if maxpcnt > 128:
   raise ValueError("Limit on patch count is artificially capped at 128 entries!")
 
@@ -395,40 +463,6 @@ if maxpcnt > 128:
 if args.format == "json":
   with open(args.outfile, "w") as ofd:
     ofd.write(json.dumps(serp, indent=2))
-
-elif args.format == "h":
-  with open(args.outfile, "w") as ofd:
-    ofd.write('// This file is autogenerated (patch_gen.py)!\n\n')
-    ofd.write('#include <stdint.h>\n\n')
-    ofd.write('typedef struct {\n')
-    ofd.write('  uint8_t gamecode[4];\n')
-    ofd.write('  uint8_t gamever;\n')
-    ofd.write('  uint8_t waitcntp, savep, flags;\n')   # Patch counts and flags
-    ofd.write('  uint32_t data[];\n')
-    ofd.write('} t_bipatch_entry;\n\n')
-
-    for i, pg in enumerate(PROGRAMS):
-      ofd.write('static const uint8_t p_prog%d[] = { %d, %s };\n' % (i, len(pg), ",".join("0x%02x" % x for x in pg)))
-
-    ofd.write('\nstatic const uint8_t *p_progs[] = { %s };\n\n' % ", ".join("p_prog%d" % i for i in range(len(PROGRAMS))))
-
-    ofd.write('static const struct {\n')
-    ofd.write('  uint32_t gamecnt;\n')
-    ofd.write('  const char *creator, *date, *version;\n')
-    ofd.write('  uint32_t data[];\n')
-    ofd.write('} bipatch = {\n')
-    ofd.write('  %d,\n' % len(fpatches))
-    ofd.write('  "%s", "%s", "%s",\n' % (args.creator, cdate.decode("ascii"), args.version))
-    ofd.write('  {\n')
-    for gcode in sorted(fpatches.keys()):
-      p = fpatches[gcode]
-      ofd.write('    0x%08x, // %s\n' % (p.gamecode_eu32(), p.gamecode()))
-      ofd.write('    0x%08x, // ver: %d [w:%d s:%d]\n' % (
-                p.header(), p.gamever(), len(p.waitcnt_patches()), len(p.save_patches())))
-      for w in p.waitcnt_patches() + p.save_patches():
-        ofd.write('    0x%08x,\n' % w)
-    ofd.write('  }\n')
-    ofd.write('};\n')
 
 elif args.format == "py":
   with open(args.outfile, "w") as ofd:
@@ -453,21 +487,26 @@ elif args.format == "py":
     ofd.write('        wl += p["waitcnt-patches"]\n')
     ofd.write('      if sys.argv[1] == "save":\n')
     ofd.write('        wl += p["save-patches"]\n')
-    ofd.write('        i = 0\n')
-    ofd.write('        while i < len(wl):\n')
-    ofd.write('          w = int(wl[i], 16); opc = w >> 28; n = (w >> 24) & 7; i += 1\n')
-    ofd.write('          fd.seek(w & 0x01FFFFFF)\n')
-    ofd.write('          if opc == 0: fd.write(PROGRAMS[n])\n')
-    ofd.write('          if opc == 1: fd.write(b"\\xC0\\x46" * n)\n')
-    ofd.write('          if opc == 2: fd.write(b"\\x00\\x00\\xA0\\xE1" * n)\n')
-    ofd.write('          if opc == 3:\n')
-    ofd.write('            numb = n + 1\n')
-    ofd.write('            buf = b"".join(struct.pack("<I", int(x, 16)) for x in wl[i:i+2])\n')
-    ofd.write('            fd.write(buf[:numb]); i += (numb + 3) // 4\n')
-    ofd.write('          if opc == 4:\n')
-    ofd.write('            numw = n + 1\n')
-    ofd.write('            fd.write(b"".join(struct.pack("<I", int(x, 16)) for x in wl[i:i+numw]))\n')
-    ofd.write('            i += numw\n')
+    ofd.write('      if sys.argv[1] == "irq":\n')
+    ofd.write('        wl += p["irq-patches"]\n')
+    ofd.write('      i = 0\n')
+    ofd.write('      while i < len(wl):\n')
+    ofd.write('        w = int(wl[i], 16); opc = w >> 28; n = (w >> 25) & 7; i += 1\n')
+    ofd.write('        fd.seek(w & 0x01FFFFFF)\n')
+    ofd.write('        if opc == 0: fd.write(PROGRAMS[n])\n')
+    ofd.write('        elif opc == 1: fd.write(b"\\xC0\\x46" * n)\n')
+    ofd.write('        elif opc == 2: fd.write(b"\\x00\\x00\\xA0\\xE1" * n)\n')
+    ofd.write('        elif opc == 3:\n')
+    ofd.write('          numb = n + 1\n')
+    ofd.write('          buf = b"".join(struct.pack("<I", int(x, 16)) for x in wl[i:i+2])\n')
+    ofd.write('          fd.write(buf[:numb]); i += (numb + 3) // 4\n')
+    ofd.write('        elif opc == 4:\n')
+    ofd.write('          numw = n + 1\n')
+    ofd.write('          fd.write(b"".join(struct.pack("<I", int(x, 16)) for x in wl[i:i+numw]))\n')
+    ofd.write('          i += numw\n')
+    ofd.write('        else:\n')
+    ofd.write('          print("Unhandled opcode", opc)\n')
+
     # TODO: Handle handler addresses, for now only patch programs
 
 elif args.format == "db":
@@ -482,7 +521,7 @@ elif args.format == "db":
     for gcode in sorted(fpatches.keys()):
       # Header + patches account for all space used.
       pe = fpatches[gcode]
-      esize = 1 + len(pe.waitcnt_patches()) + len(pe.save_patches())
+      esize = 1 + len(pe.waitcnt_patches()) + len(pe.save_patches()) + len(pe.irq_patches())
       offhdr = struct.pack("<I", pe.gamever() | (offset << 8))
       bidx += pe.gamecode().encode("ascii") + offhdr
       # Offset is expressed in words

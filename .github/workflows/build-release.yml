@@ -16,8 +16,6 @@ jobs:
       - name: Get short SHA
         id: slug
         run: echo "sha8=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_OUTPUT
-      - name: Build C header
-        run: ./tools/patch-gen.py --input patches/autogen/patches-merged-*.json --outfile build/patches.h --format h --version "${{ steps.slug.outputs.sha8 }}" --creator "github-davidgfnet-automation"
       - name: Build DB
         run: ./tools/patch-gen.py --input patches/autogen/patches-merged-*.json --outfile build/patches.db --format db --version "${{ steps.slug.outputs.sha8 }}" --creator "github-davidgfnet-automation"
       - name: Upload artifacts
