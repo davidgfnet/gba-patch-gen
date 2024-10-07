@@ -516,18 +516,24 @@ elif args.format == "db":
     # implementations can load it faster by performing a sorted-search
     # Code is 5 bytes (includes version) and 24 bit offset.
     # C C C C V O O O   (Code/Version/Offset)
-    offset = 0
-    bidx, bptch = b"", b""
+    bpatches, bidx = [], b""
     for gcode in sorted(fpatches.keys()):
       # Header + patches account for all space used.
       pe = fpatches[gcode]
-      esize = 1 + len(pe.waitcnt_patches()) + len(pe.save_patches()) + len(pe.irq_patches())
-      offhdr = struct.pack("<I", pe.gamever() | (offset << 8))
+      pload = pe.payload()
+      if pload in bpatches:
+        # Already emitted, re-use it!
+        offset = sum(len(x) for x in bpatches[:bpatches.index(pload)])
+      else:
+        offset = sum(len(x) for x in bpatches)
+        bpatches.append(pload)
+
+      # Generate header and index entry
+      assert (offset % 4) == 0
+      offhdr = struct.pack("<I", pe.gamever() | ((offset // 4) << 8))
       bidx += pe.gamecode().encode("ascii") + offhdr
-      # Offset is expressed in words
-      offset += esize
-      # Generate payload (after index)
-      bptch += pe.payload()
+
+    bptch = b"".join(bpatches)
 
     # Pad index to be a multiple of block size as well as patch data
     while len(bidx) % 512 != 0:
