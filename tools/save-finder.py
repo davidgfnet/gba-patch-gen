@@ -285,6 +285,11 @@ SAVE_STRINGS = {
   b"SRAM_F_V110": ("sram", None, None),
 }
 
+# Guesses flash size based on device IDs
+def flash_guess_size(idlist):
+  # Find known 128KB devices
+  return 128*1024 if ("0x1362" in idlist or "0x9c2" in idlist) else 64*1024
+
 # Finds all matches for a buffer and a substring
 def regexfinder(buf, regex):
   return [hex(x.start()) for x in regex.finditer(buf)]
@@ -300,6 +305,23 @@ def bytefinder(buf, hay):
     ret.append(m)
     offset = m + len(hay)
 
+savetypes_3p = []
+eeprom_savemap = {
+  "gba_eeprom_4k": 512,
+  "gba_eeprom_64k": 8*1024,
+  "gba_eeprom": 8*1024,    # No idea, assume worst case
+}
+if len(sys.argv) > 2:
+  savetypes_3p = []
+  for fn in sys.argv[2:]:
+    savetypes_3p.append(json.loads(open(fn).read()))
+
+def lookup_eeprom_size(gcode):
+  for db in savetypes_3p:
+    if gcode in db and db[gcode] in eeprom_savemap:
+      return eeprom_savemap[db[gcode]]
+  return None
+
 flist = []
 for root, dirs, files in os.walk(sys.argv[1], topdown=False):
   for name in files:
@@ -310,6 +332,10 @@ for root, dirs, files in os.walk(sys.argv[1], topdown=False):
 def process_rom(f):
   with open(f, "rb") as ifd:
     rom = ifd.read()
+
+    # Add ROM and index by gamecode/version
+    gcode = rom[0x0AC: 0x0B0].decode("ascii")
+    grev = rom[0x0BC]
 
     matches = []
     for hay in SAVE_STRINGS.keys():
@@ -372,6 +398,9 @@ def process_rom(f):
               "write_addr": wr_tgts,
             }
           }
+          guessed_size = lookup_eeprom_size(gcode)
+          if guessed_size:
+            targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
       elif gentype == "flash":
         # Ident flash and read functions are found using the regular method!
         identfn, readfn = fnhooks
@@ -390,6 +419,7 @@ def process_rom(f):
           "subtype": stype.decode("ascii"),
           "target-info": {
             "avail_devids": sorted(set([x["device_id"] for x in res])),
+            "flash-size": flash_guess_size([x["device_id"] for x in res]),
             "ident_addr": id_tgts,
             "read_addr": rd_tgts,
             "writebyte_addr": sorted(set([x["program_byte_addr"] for x in res if "program_byte_addr" in x])),
@@ -406,13 +436,12 @@ def process_rom(f):
       # We can have both EEPROM and FLASH sometimes, so we keep both patch-sets
       targets = {k:v for k,v in targets.items() if k != "sram"}
 
-    # Add ROM and index by gamecode/version
-    gcode = rom[0x0AC: 0x0B0].decode("ascii")
-    grev = rom[0x0BC]
     return ({
       "filename": os.path.basename(f),
       "filesize": len(rom),
       "sha256": hashlib.sha256(rom).hexdigest(),
+      "sha1": hashlib.sha1(rom).hexdigest(),
+      "md5": hashlib.md5(rom).hexdigest(),
       "game-code": gcode,
       "game-version": grev,
       "targets": targets

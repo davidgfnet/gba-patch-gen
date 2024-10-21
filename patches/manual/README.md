@@ -4,6 +4,16 @@ is too complicated to automatically capture them and/or patch them correctly.
 
 Currently NES emulated games have no patches at all and are not supported.
 
+save-overrides
+--------------
+
+Some games ship with code that supports more than one saving type. It is not
+clear why, but they only use one of them. Chances are it was never removed
+during development or multiple cart types were planned. Some games do ship
+backup saving code but do not use it (ie. password-style resuming).
+
+These patches override the detected save type or restrict it.
+
 240002024 patches
 -----------------
 

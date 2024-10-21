@@ -1,0 +1,151 @@
+[
+  {
+    "game-code": "B3JE",
+    "game-version": 0,
+    "info-name": "Curious George (USA).gba",
+    "targets": {
+      "save-override": "none"
+    }
+  },
+  {
+    "game-code": "B3JP",
+    "game-version": 0,
+    "info-name": "Curious George (Europe) (En,Fr,De,Es,It,Sv,Da).gba",
+    "targets": {
+      "save-override": "none"
+    }
+  },
+  {
+    "game-code": "BKGJ",
+    "game-version": 0,
+    "info-name": "Kawaii Pet Game Gallery (Japan).gba",
+    "targets": {
+      "save-override": "none"
+    }
+  },
+  {
+    "game-code": "BJCJ",
+    "game-version": 0,
+    "info-name": "Moero!! Jaleco Collection (Japan).gba",
+    "targets": {
+      "save-override": "none"
+    }
+  },
+  {
+    "game-code": "A2YE",
+    "game-version": 0,
+    "info-name": "Top Gun - Combat Zones (USA) (En,Fr,De,Es,It).gba",
+    "targets": {
+      "save-override": "none"
+    }
+  },
+
+
+  {
+    "game-code": "ABFJ",
+    "game-version": 0,
+    "info-name": "Breath of Fire - Ryuu no Senshi (Japan).gba",
+    "targets": {
+      "save-override": "sram"
+    }
+  },
+  {
+    "game-code": "ANTJ",
+    "game-version": 0,
+    "info-name": "Nihon Pro Mahjong Renmei Kounin - Tetsuman Advance - Menkyo Kaiden Series (Japan).gba",
+    "targets": {
+      "save-override": "sram"
+    }
+  },
+
+
+  {
+    "game-code": "AGHJ",
+    "game-version": 0,
+    "info-name": "Medarot G - Kabuto (Japan).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "AGIJ",
+    "game-version": 0,
+    "info-name": "Medarot G - Kuwagata (Japan).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "AK8E",
+    "game-version": 0,
+    "info-name": "Medabots AX - Metabee Ver. (USA).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "AK8P",
+    "game-version": 0,
+    "info-name": "Medabots AX - Metabee Ver. (Europe) (En,Fr,De,Es,It).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "AK9E",
+    "game-version": 0,
+    "info-name": "Medabots AX - Rokusho Ver. (USA) (Virtual Console).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "AK9P",
+    "game-version": 0,
+    "info-name": "Medabots AX - Rokusho Ver. (Europe) (En,Fr,De,Es,It) (Virtual Console).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "ALUE",
+    "game-version": 0,
+    "info-name": "Super Monkey Ball Jr. (USA).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "BKME",
+    "game-version": 0,
+    "info-name": "Kim Possible 2 - Drakken's Demise (USA) (En,Fr).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "BKMP",
+    "game-version": 0,
+    "info-name": "Kim Possible 2 - Drakken's Demise (Europe) (En,Fr,De,Es).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+  {
+    "game-code": "BKMJ",
+    "game-version": 0,
+    "info-name": "Kim Possible (Japan).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  },
+
+  {
+    "game-code": "BUHJ",
+    "game-version": 0,
+    "info-name": "Ueki no Housoku - Jingi Sakuretsu! Nouryokusha Battle (Japan).gba",
+    "targets": {
+      "save-override": "eeprom"
+    }
+  }
+]

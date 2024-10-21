@@ -126,6 +126,8 @@ def process_rom(f):
       "filename": os.path.basename(f),
       "filesize": len(rom),
       "sha256": hashlib.sha256(rom).hexdigest(),
+      "sha1": hashlib.sha1(rom).hexdigest(),
+      "md5": hashlib.md5(rom).hexdigest(),
       "game-code": gcode,
       "game-version": grev,
       "targets": {

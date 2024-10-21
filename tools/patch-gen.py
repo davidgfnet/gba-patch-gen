@@ -377,15 +377,28 @@ class GamePatch(object):
     assert all((x & 0xFFFFFFFF) == x for x in self._save_patches)
 
     # we don't support more than this for now
-    assert (len(self._save_patches)) < 64          # Limit to 64, we use two MSB for flags
+    assert (len(self._save_patches)) < 32          # Limit to 32, we use three MSB for save type
     assert (len(self._waitcnt_patches)) < 256
     assert (len(self._irq_patches)) < 256
 
-    does_save = any(x in targets for x in ["eeprom", "sram", "flash"])
-    uses_128k = targets.get("flash", {}).get("subtype", "").startswith("FLASH1M")
+    saveflg = 0      # No save
+    if "sram" in targets:
+      saveflg = 1    # SRAM (32KiB)
+    elif "eeprom" in targets:
+      if "eeprom-size" not in targets["eeprom"]["target-info"]:
+        print("No eeprom size defined for", gamecode, "defaulting to 8KB")
+        saveflg = 3
+      elif targets["eeprom"]["target-info"]["eeprom-size"] == 512:
+        saveflg = 2
+      else:
+        saveflg = 3
+    elif "flash" in targets:
+      if targets["flash"]["target-info"]["flash-size"] == 64*1024:
+        saveflg = 4    # FLASH 64KiB
+      else:
+        saveflg = 5    # FLASH 128KiB
 
-    self._save_flags = ( (0x80 if does_save else 0) |
-                         (0x40 if uses_128k else 0))
+    self._save_flags = saveflg << 5
 
     self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches + self._irq_patches)
 

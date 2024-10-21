@@ -23,6 +23,18 @@ WAITCNT_PATCH_TYPES = frozenset([
   "swi1-arm", "swi1-bl-thumb"
 ])
 
+def save_overrides(patchmap):
+  if "save-override" in patchmap:
+    for t in ["eeprom", "sram", "flash"]:
+      if t != patchmap["save-override"] and t in patchmap:
+        del patchmap[t]
+
+    if patchmap["save-override"] not in patchmap:
+      if patchmap["save-override"] != "none":
+        patchmap[patchmap["save-override"]] = {}
+
+    del patchmap["save-override"]
+
 def waitcnt_merge(a, b):
   # Merge and deduplicate patches
   ret = a["patch-sites"] + b["patch-sites"]
@@ -86,7 +98,9 @@ for fn in args.inpatches:
     if "filename" in e:
       gameset[key]["files"].append({
         "filename": e["filename"],
-        "sha256": e["sha256"]
+        "sha256": e["sha256"],
+        "sha1": e["sha1"],
+        "md5": e["md5"]
       })
 
   patchset.append(gameset)
@@ -126,6 +140,12 @@ for key in sorted(gcodes):
             conflicts.append("Duplicate entry " + ttype + " for " + str(key) + ": " + str(tinfo))
         else:
           patchmap[ttype] = tinfo
+
+  # Perform save-overrides, this usually involves deleting save types.
+  save_overrides(patchmap)
+  # In general each game has one save type
+  if len([k for k in patchmap.keys() if k in ["eeprom", "sram", "flash"]]) > 1:
+    print("Warning! Game", key[0], "has multiple save types")
 
   # Sanity check, ensure we do not have two patches for the same offset!
   if "waitcnt" in patchmap:
