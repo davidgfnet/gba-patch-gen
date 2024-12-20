@@ -64,8 +64,14 @@ OPC_NOP_ARM   = 2
 OPC_COPY_BYTE = 3
 OPC_COPY_WORD = 4
 
+OPC_RTC_HD    = 7
 OPC_EEPROM_HD = 8
 OPC_FLASH_HD  = 9
+
+RTC_PROBE_HNDLR  = 0x0
+RTC_RESET_HNDLR  = 0x1
+RTC_STSRD_HNDLR  = 0x2
+RTC_GETTD_HNDLR  = 0x3
 
 EEPROM_RD_HNDLR  = 0x0
 EEPROM_WR_HNDLR  = 0x1
@@ -98,6 +104,11 @@ def gen_prgwr(addr, pgn):
   assert pgn < 8
   assert (addr & ~0x1FFFFFF) == 0
   return [ (OPC_WR_BUF << 28) | (pgn << 25) | addr ]
+
+def gen_rtc_opc(addr, typenum):
+  assert typenum >= RTC_PROBE_HNDLR and typenum <= RTC_GETTD_HNDLR
+  assert (addr & ~0x1FFFFFF) == 0
+  return [ (OPC_RTC_HD << 28) | (typenum << 25) | addr ]
 
 def gen_eeprom_opc(addr, typenum):
   assert typenum >= EEPROM_RD_HNDLR and typenum <= EEPROM_WR_HNDLR
@@ -278,6 +289,14 @@ def gen_eeprom_patch(eeprom_info):
     ret += gen_eeprom_opc(int(addr, 16), EEPROM_WR_HNDLR)
   return ret
 
+def gen_rtc_patch(rtc_info):
+  ret = []
+  ret += gen_rtc_opc(int(rtc_info["probe_fn"], 16), RTC_PROBE_HNDLR)
+  ret += gen_rtc_opc(int(rtc_info["reset_fn"], 16), RTC_RESET_HNDLR)
+  ret += gen_rtc_opc(int(rtc_info["getstatus_fn"], 16), RTC_STSRD_HNDLR)
+  ret += gen_rtc_opc(int(rtc_info["gettimedate_fn"], 16), RTC_GETTD_HNDLR)
+  return ret
+
 def gen_flash_patch(flash_info):
   ret = []
   # Determnine whether this is a 64KB or a 128KB game.
@@ -362,10 +381,13 @@ class GamePatch(object):
 
     self._save_patches = []
     self._irq_patches = []
+    self._rtc_patches = []
+
+    if "rtc" in targets:
+      self._rtc_patches += gen_rtc_patch(targets["rtc"])
 
     if "eeprom" in targets:
-      self._save_patches += gen_eeprom_patch(
-        targets["eeprom"]["target-info"])
+      self._save_patches += gen_eeprom_patch(targets["eeprom"]["target-info"])
 
     if "flash" in targets:
       self._save_patches += gen_flash_patch(targets["flash"])
@@ -380,6 +402,7 @@ class GamePatch(object):
     assert (len(self._save_patches)) < 32          # Limit to 32, we use three MSB for save type
     assert (len(self._waitcnt_patches)) < 256
     assert (len(self._irq_patches)) < 256
+    assert (len(self._rtc_patches)) < 32
 
     saveflg = 0      # No save
     if "sram" in targets:
@@ -400,7 +423,7 @@ class GamePatch(object):
 
     self._save_flags = saveflg << 5
 
-    self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches + self._irq_patches)
+    self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches + self._irq_patches + self._rtc_patches)
 
   def gamecode(self):
     return self._gamecode
@@ -411,7 +434,8 @@ class GamePatch(object):
   def dbheader(self):
     return (len(self._waitcnt_patches) |
             ((len(self._save_patches) | self._save_flags) << 8) |
-            (len(self._irq_patches) << 16))
+            (len(self._irq_patches) << 16) |
+            (len(self._rtc_patches) << 24))
 
   def gamever(self):
     return self._gamever
@@ -427,6 +451,9 @@ class GamePatch(object):
 
   def irq_patches(self):
     return self._irq_patches
+
+  def rtc_patches(self):
+    return self._rtc_patches
 
   def size(self):
     return len(self._data)
@@ -458,16 +485,18 @@ for gcode in sorted(fpatches.keys()):
     "waitcnt-patches": ["0x%08x" % x for x in fpatches[gcode].waitcnt_patches()],
     "save-patches": ["0x%08x" % x for x in fpatches[gcode].save_patches()],
     "irq-patches": ["0x%08x" % x for x in fpatches[gcode].irq_patches()],
+    "rtc-patches": ["0x%08x" % x for x in fpatches[gcode].rtc_patches()],
   })
 
 maxsave = max([len(gobj.save_patches())    for gobj in fpatches.values()])
 maxwcnt = max([len(gobj.waitcnt_patches()) for gobj in fpatches.values()])
 maxirqh = max([len(gobj.irq_patches())     for gobj in fpatches.values()])
+maxrtcp = max([len(gobj.rtc_patches())     for gobj in fpatches.values()])
 
-maxpcnt = max([len(gobj.save_patches()) + len(gobj.waitcnt_patches()) + len(gobj.irq_patches())
+maxpcnt = max([len(gobj.save_patches()) + len(gobj.waitcnt_patches()) + len(gobj.irq_patches()) + len(gobj.rtc_patches())
               for gobj in fpatches.values()])
 
-print("Number of games:", len(fpatches), "| Maximum patch count:", maxsave, "(save)", maxwcnt, "(waitcnt)", maxirqh, "(irqhdr)", maxpcnt, "(total)")
+print("Number of games:", len(fpatches), "| Maximum patch count:", maxsave, "(save)", maxwcnt, "(waitcnt)", maxirqh, "(irqhdr)", maxrtcp, "(rtc)", maxpcnt, "(total)")
 if maxpcnt > 128:
   raise ValueError("Limit on patch count is artificially capped at 128 entries!")
 
