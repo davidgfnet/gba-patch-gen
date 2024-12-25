@@ -214,8 +214,12 @@ aproxm_v2 = re.compile(b'...[\\x08\\x09]...[\\x08\\x09]...[\\x08\\x09]...[\\x08\
 def isp2(n):
   return (n & (n-1) == 0) and n != 0
 
+def is_func_prologue(bseq):
+  inst = struct.unpack("<H", bseq)[0]
+  return (inst & 0xFE00) == 0xB400
+
 # Extracts data from the structure and validates it (returns None for false positives)
-def flash_unpack_v1(data):
+def flash_unpack_v1(boff, fulldata, data):
   pg_sec, clrfull, clrsec, waitfn, _, fsize, ssize, _, scnt, _, _, _, _, devid = struct.unpack("<IIIIIIIHHHHHHH", data[:42])
   if (fsize == 0 or ssize == 0 or
       fsize // ssize != scnt or
@@ -223,17 +227,30 @@ def flash_unpack_v1(data):
       or devid not in KNOWN_DEVICE_IDS):
     return None
 
+  # Functions are thumb usually, remove last bit
+  pg_sec  = pg_sec  & 0x1FFFFFE
+  clrfull = clrfull & 0x1FFFFFE
+  clrsec  = clrsec  & 0x1FFFFFE
+  waitfn  = waitfn  & 0x1FFFFFE
+
+  if (not is_func_prologue(fulldata[pg_sec:pg_sec+2]) or
+      not is_func_prologue(fulldata[clrfull:clrfull+2]) or
+      not is_func_prologue(fulldata[clrsec:clrsec+2]) or
+      not is_func_prologue(fulldata[waitfn:waitfn+2])):
+    return None
+
   return {
-    "program_sect_addr": hex(pg_sec  & 0x1FFFFFE),
-    "erase_chip_addr":   hex(clrfull & 0x1FFFFFE),
-    "erase_sect_addr":   hex(clrsec  & 0x1FFFFFE),
-    "wait_write_addr":   hex(waitfn  & 0x1FFFFFE),
+    "flashinfo": hex(boff),
+    "program_sect_addr": hex(pg_sec),
+    "erase_chip_addr":   hex(clrfull),
+    "erase_sect_addr":   hex(clrsec),
+    "wait_write_addr":   hex(waitfn),
     "flash_size": fsize,
     "device_id": hex(devid),
     "flash_devsize": KNOWN_DEVICE_IDS[devid],
   }
 
-def flash_unpack_v2(data):
+def flash_unpack_v2(boff, fulldata, data):
   pg_byte, pg_sec, clrfull, clrsec, waitfn, _, fsize, ssize, _, scnt, _, _, _, _, devid = struct.unpack("<IIIIIIIIHHHHHHH", data[:46])
   if (fsize == 0 or ssize == 0 or
       fsize // ssize != scnt or
@@ -241,12 +258,27 @@ def flash_unpack_v2(data):
       or devid not in KNOWN_DEVICE_IDS):
     return None
 
+  # Functions are thumb usually, remove last bit
+  pg_byte = pg_byte & 0x1FFFFFE
+  pg_sec  = pg_sec  & 0x1FFFFFE
+  clrfull = clrfull & 0x1FFFFFE
+  clrsec  = clrsec  & 0x1FFFFFE
+  waitfn  = waitfn  & 0x1FFFFFE
+
+  if (not is_func_prologue(fulldata[pg_sec:pg_sec+2]) or
+      not is_func_prologue(fulldata[pg_byte:pg_byte+2]) or
+      not is_func_prologue(fulldata[clrfull:clrfull+2]) or
+      not is_func_prologue(fulldata[clrsec:clrsec+2]) or
+      not is_func_prologue(fulldata[waitfn:waitfn+2])):
+    return None
+
   return {
-    "program_byte_addr": hex(pg_byte & 0x1FFFFFE),
-    "program_sect_addr": hex(pg_sec  & 0x1FFFFFE),
-    "erase_chip_addr":   hex(clrfull & 0x1FFFFFE),
-    "erase_sect_addr":   hex(clrsec  & 0x1FFFFFE),
-    "wait_write_addr":   hex(waitfn  & 0x1FFFFFE),
+    "flashinfo": hex(boff),
+    "program_byte_addr": hex(pg_byte),
+    "program_sect_addr": hex(pg_sec),
+    "erase_chip_addr":   hex(clrfull),
+    "erase_sect_addr":   hex(clrsec),
+    "wait_write_addr":   hex(waitfn),
     "flash_size": fsize,
     "device_id": hex(devid),
     "flash_devsize": KNOWN_DEVICE_IDS[devid],
@@ -408,8 +440,8 @@ def process_rom(f):
         rd_tgts = regexfinder(rom, readfn)
 
         # Find the per-device functions by finding the device impl. table
-        res0 = [flash_unpack_v1(rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
-        res1 = [flash_unpack_v2(rom[m.start() : m.start() + 128]) for m in aproxm_v2.finditer(rom)]
+        res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
+        res1 = [flash_unpack_v2(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v2.finditer(rom)]
 
         # Filter out false positives, since the regex is not perfect
         res = [x for x in (res0 + res1) if x is not None]
