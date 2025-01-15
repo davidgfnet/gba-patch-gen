@@ -63,10 +63,16 @@ OPC_NOP_THUMB = 1
 OPC_NOP_ARM   = 2
 OPC_COPY_BYTE = 3
 OPC_COPY_WORD = 4
+OPC_PATCH_FN  = 5
 
 OPC_RTC_HD    = 7
 OPC_EEPROM_HD = 8
 OPC_FLASH_HD  = 9
+
+FUNC_RET0_THUMB  = 0x0
+FUNC_RET1_THUMB  = 0x1
+FUNC_RET0_ARM    = 0x4
+FUNC_RET1_ARM    = 0x5
 
 RTC_PROBE_HNDLR  = 0x0
 RTC_RESET_HNDLR  = 0x1
@@ -81,6 +87,11 @@ FLASH_CLRC_HNDLR = 0x1
 FLASH_CLRS_HNDLR = 0x2
 FLASH_WRTS_HNDLR = 0x3
 FLASH_WRBT_HNDLR = 0x4
+
+def gen_patchfunc(addr, isthumb, rettrue):
+  assert (addr & ~0x1FFFFFF) == 0
+  fn_num = (0 if isthumb else 4) + (1 if rettrue else 0)
+  return [ (OPC_PATCH_FN << 28) | (fn_num << 25) | addr ]
 
 def gen_cpywords(addr, words):
   assert len(words) <= 8 and len(words) > 0
@@ -306,6 +317,10 @@ def gen_flash_patch(flash_info):
   for iaddr in flash_info["target-info"]["ident_addr"]:
     prgn = PROG_FLH128_ID if is128 else PROG_FLH64_ID
     ret += gen_prgwr(int(iaddr, 16), prgn)
+
+  # Patch the flash verify function to always return 0 (verified OK)
+  for iaddr in flash_info["target-info"]["verify_addr"]:
+    ret += gen_patchfunc(int(iaddr, 16), True, False)
 
   # Emit patching info for every other routine (so that the FW can patch them)
   # with a relevant implementation (usually emulating it using SRAM).
@@ -547,6 +562,8 @@ elif args.format == "py":
     ofd.write('          numw = n + 1\n')
     ofd.write('          fd.write(b"".join(struct.pack("<I", int(x, 16)) for x in wl[i:i+numw]))\n')
     ofd.write('          i += numw\n')
+    ofd.write('        elif opc == 5:\n')
+    ofd.write('          print("OPC_PATCH_FN opcode is not handled yet!")\n')
     ofd.write('        else:\n')
     ofd.write('          print("Unhandled opcode", opc)\n')
 
