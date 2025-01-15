@@ -225,6 +225,25 @@ flash_v1_verify = packinsts([
   0x2303,          # movs    r3, #3
   0x1c11,          # adds    r1, r2, #0
 ])
+# A flavour that only verifes the first N bytes, not present in early versions.
+flash_v3_verifyn = packinsts([
+  0xb570,          # push {r4, r5, r6, lr}
+  0xb0c0,          # sub  sp, #256
+  0x1c0d,          # adds r5, r1, #0
+  0x1c16,          # adds r6, r2, #0
+  0x0402,          # lsls r2, r0, #16
+  0x0c14,          # lsrs r4, r2, #16
+  None,            # ldr  r0, [pc, #X]
+  0x6800,          # ldr  r0, [r0, #0]
+  0x6801,          # ldr  r1, [r0, #0]
+  0x2080,          # movs r0, #128
+  0x0280,          # lsls r0, r0, #10
+  0x4281,          # cmp  r1, r0
+  None,            # bne  off
+  0x0d10,          # lsrs r0, r2, #20
+  0x0600,          # lsls r0, r0, #24
+  0x0e00,          # lsrs r0, r0, #24
+])
 
 
 KNOWN_DEVICE_IDS = {
@@ -355,17 +374,17 @@ SAVE_STRINGS = {
   b"EEPROM_V125": ("eeprom", None, eeprom_v12x_readfn, eeprom_v12_45_writefn),  # A couple games use this
   b"EEPROM_V126": ("eeprom", None, eeprom_v12x_readfn, eeprom_v126_writefn),    # A handful of games use this
   # Flash versions
-  b"FLASH_V120":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),   # ~2 games
-  b"FLASH_V121":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),   # ~15 games
-  b"FLASH_V123":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~15 games
-  b"FLASH_V124":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~20 games
-  b"FLASH_V125":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~2 games
-  b"FLASH_V126":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~60 games
-  b"FLASH512_V130": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~15 games
-  b"FLASH512_V131": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~70 games
-  b"FLASH512_V133": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~10 games (2in1 mostly)
-  b"FLASH1M_V102":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~20 games
-  b"FLASH1M_V103":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~50 ROMs (Pokemon)
+  b"FLASH_V120":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),                     # ~2 games
+  b"FLASH_V121":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),                     # ~15 games
+  b"FLASH_V123":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~15 games
+  b"FLASH_V124":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~20 games
+  b"FLASH_V125":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~2 games
+  b"FLASH_V126":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~60 games
+  b"FLASH512_V130": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~15 games
+  b"FLASH512_V131": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~70 games
+  b"FLASH512_V133": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~10 games (2in1 mostly)
+  b"FLASH1M_V102":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~20 games
+  b"FLASH1M_V103":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~50 ROMs (Pokemon)
 
   # SRAM
   b"SRAM_V110":   ("sram", None, None),
@@ -496,10 +515,12 @@ def process_rom(f):
             targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
       elif gentype == "flash":
         # Ident flash and read functions are found using the regular method!
-        identfn, readfn, verifn = fnhooks
+        identfn, readfn, *verifns = fnhooks
         id_tgts = regexfinder(rom, identfn)
         rd_tgts = regexfinder(rom, readfn)
-        ve_tgts = regexfinder(rom, verifn)
+        ve_tgts = []
+        for m in verifns:
+          ve_tgts += regexfinder(rom, m)
 
         # Find the per-device functions by finding the device impl. table
         res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
