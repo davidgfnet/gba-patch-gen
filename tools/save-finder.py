@@ -166,6 +166,67 @@ flash_v3_read = packinsts([
   0x4008,          # ands r0, r1
 ])
 
+flash_v3_verify = packinsts([
+  0xb530,          # push {r4, r5, lr}
+  0xb0c0,          # sub sp, #256
+  0x1c0d,          # adds r5, r1, #0
+  0x0403,          # lsls r3, r0, #16
+  0x0c1c,          # lsrs r4, r3, #16
+  None,            # ldr  r2, [pc, #X]
+  0x8810,          # ldrh r0, [r2, #0]
+  None,            # ldr  r1, [pc, #X]
+  0x4008,          # ands r0, r1
+  0x2103,          # movs r1, #3
+  0x4308,          # orrs r0, r1
+  0x8010,          # strh r0, [r2, #0]
+  None,            # ldr  r0, [pc, #X]
+  0x6800,          # ldr  r0, [r0, #0]
+  0x6801,          # ldr  r1, [r0, #0]
+  0x2080,          # movs r0, #128
+  0x0280,          # lsls r0, r0, #10
+  0x4281,          # cmp  r1, r0
+  None,            # bne.n OFF
+  0x0d18,          # lsrs r0, r3, #20
+  0x0600,          # lsls r0, r0, #24
+  0x0e00,          # lsrs r0, r0, #24
+])
+flash_v2_verify = packinsts([
+  0xb530,          # push {r4, r5, lr}
+  0xb0c0,          # sub sp, #256
+  0x1c0d,          # adds r5, r1, #0
+  0x0400,          # lsls r0, r0, #16
+  0x0c04,          # lsrs r4, r0, #16
+  None,            # ldr  r2, [pc, X]
+  0x8810,          # ldrh r0, [r2, #0]
+  None,            # ldr  r1, [pc, X]
+  0x4008,          # ands r0, r1
+  0x2103,          # movs r1, #3
+  0x4308,          # orrs r0, r1
+  0x8010,          # strh r0, [r2, #0]
+  None,            # ldr  r0, [pc, X]
+  0x2001,          # movs r0, #1
+  0x4043,          # eors r3, r0
+  0x466a,          # mov  r2, sp
+])
+flash_v1_verify = packinsts([
+  0xb590,          # push    {r4, r7, lr}
+  0xb0c9,          # sub     sp, #292
+  0x466f,          # mov     r7, sp
+  0x6079,          # str     r1, [r7, #4]
+  0x1c39,          # adds    r1, r7, #0
+  0x8008,          # strh    r0, [r1, #0]
+  None,            # ldr     r0, [pc, #X]
+  None,            # ldr     r1, [pc, #X]
+  0x880a,          # ldrh    r2, [r1, #0]
+  None,            # ldr     r3, [pc, #X]
+  0x1c11,          # adds    r1, r2, #0
+  0x4019,          # ands    r1, r3
+  0x1c0a,          # adds    r2, r1, #0
+  0x2303,          # movs    r3, #3
+  0x1c11,          # adds    r1, r2, #0
+])
+
+
 KNOWN_DEVICE_IDS = {
   0x0000:        0,    # Undefined/default device
   0x3D1F:  64*1024,    # Atmel 64KB (a bit special)
@@ -294,17 +355,17 @@ SAVE_STRINGS = {
   b"EEPROM_V125": ("eeprom", None, eeprom_v12x_readfn, eeprom_v12_45_writefn),  # A couple games use this
   b"EEPROM_V126": ("eeprom", None, eeprom_v12x_readfn, eeprom_v126_writefn),    # A handful of games use this
   # Flash versions
-  b"FLASH_V120":    ("flash", "v1", flash_identfn_v1, flash_v1_read),   # ~2 games
-  b"FLASH_V121":    ("flash", "v1", flash_identfn_v1, flash_v1_read),   # ~15 games
-  b"FLASH_V123":    ("flash", "v2", flash_identfn_v2, flash_v2_read),   # ~15 games
-  b"FLASH_V124":    ("flash", "v2", flash_identfn_v2, flash_v2_read),   # ~20 games
-  b"FLASH_V125":    ("flash", "v2", flash_identfn_v2, flash_v2_read),   # ~2 games
-  b"FLASH_V126":    ("flash", "v2", flash_identfn_v2, flash_v2_read),   # ~60 games
-  b"FLASH512_V130": ("flash", "v3", flash_identfn_v2, flash_v3_read),   # ~15 games
-  b"FLASH512_V131": ("flash", "v3", flash_identfn_v2, flash_v3_read),   # ~70 games
-  b"FLASH512_V133": ("flash", "v3", flash_identfn_v2, flash_v3_read),   # ~10 games (2in1 mostly)
-  b"FLASH1M_V102":  ("flash", "v3", flash_identfn_v2, flash_v3_read),   # ~20 games
-  b"FLASH1M_V103":  ("flash", "v3", flash_identfn_v2, flash_v3_read),   # ~50 ROMs (Pokemon)
+  b"FLASH_V120":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),   # ~2 games
+  b"FLASH_V121":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),   # ~15 games
+  b"FLASH_V123":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~15 games
+  b"FLASH_V124":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~20 games
+  b"FLASH_V125":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~2 games
+  b"FLASH_V126":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),   # ~60 games
+  b"FLASH512_V130": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~15 games
+  b"FLASH512_V131": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~70 games
+  b"FLASH512_V133": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~10 games (2in1 mostly)
+  b"FLASH1M_V102":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~20 games
+  b"FLASH1M_V103":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify),   # ~50 ROMs (Pokemon)
 
   # SRAM
   b"SRAM_V110":   ("sram", None, None),
@@ -435,9 +496,10 @@ def process_rom(f):
             targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
       elif gentype == "flash":
         # Ident flash and read functions are found using the regular method!
-        identfn, readfn = fnhooks
+        identfn, readfn, verifn = fnhooks
         id_tgts = regexfinder(rom, identfn)
         rd_tgts = regexfinder(rom, readfn)
+        ve_tgts = regexfinder(rom, verifn)
 
         # Find the per-device functions by finding the device impl. table
         res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
@@ -454,6 +516,7 @@ def process_rom(f):
             "flash-size": flash_guess_size([x["device_id"] for x in res]),
             "ident_addr": id_tgts,
             "read_addr": rd_tgts,
+            "verify_addr": ve_tgts,
             "writebyte_addr": sorted(set([x["program_byte_addr"] for x in res if "program_byte_addr" in x])),
             "writesect_addr": sorted(set([x["program_sect_addr"] for x in res])),
             "erasefull_addr": sorted(set([x["erase_chip_addr"] for x in res])),
