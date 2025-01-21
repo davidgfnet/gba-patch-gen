@@ -15,9 +15,21 @@ Here there's a collection of tools for patch generation.
    is not strictly required but helps game performance (ie. by preserving the
    gamepak bus prefetch bit).
 
+ * irq-finder.py: Finds instructions and/or literal values where a game updates
+   its IRQ handler function address. This address is placed at 0x03007FFC (or
+   some mirror) and is used by the BIOS to pass interrupts to a user-defined
+   routine. The output produced is a mixture of literal values but also str
+   instructions that update said address. The patcher can decide to either
+   patch the pool address or the store instruction. It is also capable of
+   detecting certain memset code that results in 0x03007FF4 being cleared.
+   This address is used as a shadow IRQ handler address and must be preserved.
+
  * save-finder.py: Since FLASH and EEPROM are unavailable as storage mediums
    this script finds the relevant storage routines and produces patch
    information for them. A list of routine addresses is produced.
+
+ * rtc-finder.py: Finds RTC routines by looking for certain function prologues
+   and produces a list of function addresses so that they can be hooked.
 
  * layout-finder.py: Produces some free-space / hole / header information for
    ROMs. The purpose is to enable certain patching methods to succeed. In

@@ -32,6 +32,7 @@ The following opcodes exist:
   - 0x2: Overwrite N instructions at the specified address with an ARM nop (0xE1A00000)
   - 0x3: Patch address with 1-8 bytes from the following word
   - 0x4: Patch address with the N (1..8) subsequent words.
+  - 0x5: Patch address with a dummy function returning 0 or 1 (depends on argument)
 
 Each patching database comes with a set of up to 8 buffers. These are sequences
 of arbitrary bytes of arbitrary length up to 60 bytes. These are global for the
@@ -101,6 +102,24 @@ individual devices).
 
 The patcher will usually patch the identify function to return a hardcoded
 device ID (since it is necessary to perform any operation) and let the firmware
-patch the read/write/erase functions with the relevant handlers.
+patch the read/write/erase functions with the relevant handlers. Some other
+(seems like newer) functions might also be patched, in particular a
+verification function that compares just-written data to the user buffer. This
+function is also patched with dummy function code to always pass validation.
+
+
+RTC patches
+===========
+
+Games using an RTC device (connected via GPIO to the ROM bus) can have their
+RTC implementation emulated if certain functions are detected and hooked. It
+seems that the SDK has a bunch of functions that can be easily patched to do
+so. The following handlers are provided:
+
+  - 0x7: RTC handler addresses
+     - 0x0: RTC probe
+     - 0x1: RTC reset
+     - 0x2: RTC get status
+     - 0x3: RTC get time and date
 
 
