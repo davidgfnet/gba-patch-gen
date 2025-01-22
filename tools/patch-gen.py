@@ -308,6 +308,24 @@ def gen_rtc_patch(rtc_info):
   ret += gen_rtc_opc(int(rtc_info["gettimedate_fn"], 16), RTC_GETTD_HNDLR)
   return ret
 
+def gen_layout_patch(layout_info, romsize):
+  ret = []
+  if "tail-padding" in layout_info:
+    tail_size = layout_info["tail-padding"]
+    if tail_size >= 4*1024:
+      addr = romsize - tail_size
+      # Adjust address a bit up, and size too
+      addr = ((addr + 1023) >> 10) << 10
+      gap_size = romsize - addr - 1024
+      assert gap_size > 0
+      if gap_size >= 7*1024:
+        assert gap_size < 32*1024*1024
+        assert addr < 32*1024*1024
+        # Simply emit address (multiple of 1024) and size (in KB as well)
+        w = (gap_size >> 10) | ((addr >> 10) << 16)
+        ret.append(w)
+  return ret
+
 def gen_flash_patch(flash_info):
   ret = []
   # Determnine whether this is a 64KB or a 128KB game.
@@ -397,6 +415,11 @@ class GamePatch(object):
     self._save_patches = []
     self._irq_patches = []
     self._rtc_patches = []
+    self._layout_patches = []
+
+    # Provide some hole/trailing info if the ROM is over 31MB. Helps with patching
+    if romsize > 31*1024*1024:
+      self._layout_patches += gen_layout_patch(targets.get("layout", {}).get("info", {}), romsize)
 
     if "rtc" in targets:
       self._rtc_patches += gen_rtc_patch(targets["rtc"])
@@ -417,7 +440,8 @@ class GamePatch(object):
     assert (len(self._save_patches)) < 32          # Limit to 32, we use three MSB for save type
     assert (len(self._waitcnt_patches)) < 256
     assert (len(self._irq_patches)) < 256
-    assert (len(self._rtc_patches)) < 32
+    assert (len(self._rtc_patches)) < 16
+    assert (len(self._layout_patches)) <= 1        # Limit it to one single element
 
     saveflg = 0      # No save
     if "sram" in targets:
@@ -437,8 +461,9 @@ class GamePatch(object):
         saveflg = 5    # FLASH 128KiB
 
     self._save_flags = saveflg << 5
+    self._extra_flags = 0x1 if self._layout_patches else 0x0       # Indicate whether we have some layout (tail/hole) info
 
-    self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches + self._irq_patches + self._rtc_patches)
+    self._data = b"".join(struct.pack("<I", x) for x in self._waitcnt_patches + self._save_patches + self._irq_patches + self._rtc_patches + self._layout_patches)
 
   def gamecode(self):
     return self._gamecode
@@ -450,7 +475,7 @@ class GamePatch(object):
     return (len(self._waitcnt_patches) |
             ((len(self._save_patches) | self._save_flags) << 8) |
             (len(self._irq_patches) << 16) |
-            (len(self._rtc_patches) << 24))
+            ((len(self._rtc_patches) | (self._extra_flags << 4)) << 24))
 
   def gamever(self):
     return self._gamever
@@ -463,6 +488,9 @@ class GamePatch(object):
 
   def save_patches(self):
     return self._save_patches
+
+  def layout_patches(self):
+    return self._layout_patches
 
   def irq_patches(self):
     return self._irq_patches
@@ -507,11 +535,12 @@ maxsave = max([len(gobj.save_patches())    for gobj in fpatches.values()])
 maxwcnt = max([len(gobj.waitcnt_patches()) for gobj in fpatches.values()])
 maxirqh = max([len(gobj.irq_patches())     for gobj in fpatches.values()])
 maxrtcp = max([len(gobj.rtc_patches())     for gobj in fpatches.values()])
+maxlayo = max([len(gobj.layout_patches())  for gobj in fpatches.values()])
 
-maxpcnt = max([len(gobj.save_patches()) + len(gobj.waitcnt_patches()) + len(gobj.irq_patches()) + len(gobj.rtc_patches())
+maxpcnt = max([len(gobj.save_patches()) + len(gobj.waitcnt_patches()) + len(gobj.irq_patches()) + len(gobj.rtc_patches()) + len(gobj.layout_patches())
               for gobj in fpatches.values()])
 
-print("Number of games:", len(fpatches), "| Maximum patch count:", maxsave, "(save)", maxwcnt, "(waitcnt)", maxirqh, "(irqhdr)", maxrtcp, "(rtc)", maxpcnt, "(total)")
+print("Number of games:", len(fpatches), "| Maximum patch count:", maxsave, "(save)", maxwcnt, "(waitcnt)", maxirqh, "(irqhdr)", maxrtcp, "(rtc)", maxlayo, "(layout)", maxpcnt, "(total)")
 if maxpcnt > 128:
   raise ValueError("Limit on patch count is artificially capped at 128 entries!")
 
