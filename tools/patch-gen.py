@@ -529,6 +529,7 @@ for gcode in sorted(fpatches.keys()):
     "save-patches": ["0x%08x" % x for x in fpatches[gcode].save_patches()],
     "irq-patches": ["0x%08x" % x for x in fpatches[gcode].irq_patches()],
     "rtc-patches": ["0x%08x" % x for x in fpatches[gcode].rtc_patches()],
+    "layout-patches": ["0x%08x" % x for x in fpatches[gcode].layout_patches()],
   })
 
 maxsave = max([len(gobj.save_patches())    for gobj in fpatches.values()])
