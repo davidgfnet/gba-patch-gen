@@ -321,10 +321,10 @@ def flash_unpack_v1(boff, fulldata, data):
 
   return {
     "flashinfo": hex(boff),
-    "program_sect_addr": hex(pg_sec),
-    "erase_chip_addr":   hex(clrfull),
-    "erase_sect_addr":   hex(clrsec),
-    "wait_write_addr":   hex(waitfn),
+    "program_sect": hex(pg_sec),
+    "erase_chip":   hex(clrfull),
+    "erase_sect":   hex(clrsec),
+    "wait_write":   hex(waitfn),
     "flash_size": fsize,
     "device_id": hex(devid),
     "flash_devsize": KNOWN_DEVICE_IDS[devid],
@@ -354,11 +354,11 @@ def flash_unpack_v2(boff, fulldata, data):
 
   return {
     "flashinfo": hex(boff),
-    "program_byte_addr": hex(pg_byte),
-    "program_sect_addr": hex(pg_sec),
-    "erase_chip_addr":   hex(clrfull),
-    "erase_sect_addr":   hex(clrsec),
-    "wait_write_addr":   hex(waitfn),
+    "program_byte": hex(pg_byte),
+    "program_sect": hex(pg_sec),
+    "erase_chip":   hex(clrfull),
+    "erase_sect":   hex(clrsec),
+    "wait_write":   hex(waitfn),
     "flash_size": fsize,
     "device_id": hex(devid),
     "flash_devsize": KNOWN_DEVICE_IDS[devid],
@@ -405,6 +405,21 @@ def flash_guess_size(idlist):
 # Finds all matches for a buffer and a substring
 def regexfinder(buf, regex):
   return [hex(x.start()) for x in regex.finditer(buf)]
+
+def find_bx(rom, start):
+  while True:
+    inst = struct.unpack("<H", rom[start:start+2])[0]
+    if (inst & 0xFF07) == 0x4700:
+      return start
+    start += 2
+
+# For a given list of functions, parses them trying to find the end of the function
+def parse_fns_thumb(rom, tgts):
+  ret = []
+  for t in tgts:
+    off = int(t, 16)
+    ret.append({"addr": t, "size": find_bx(rom, off) + 2 - off})
+  return sorted(ret, key=lambda x: tuple(x))
 
 # Finds all matches for a buffer and a substring
 def bytefinder(buf, hay):
@@ -506,8 +521,8 @@ def process_rom(f):
           targets["eeprom"] = {
             "subtype": stype.decode("ascii"),
             "target-info": {
-              "read_addr": rd_tgts,
-              "write_addr": wr_tgts,
+              "read": parse_fns_thumb(rom, rd_tgts),
+              "write": parse_fns_thumb(rom, wr_tgts),
             }
           }
           guessed_size = lookup_eeprom_size(gcode)
@@ -516,11 +531,12 @@ def process_rom(f):
       elif gentype == "flash":
         # Ident flash and read functions are found using the regular method!
         identfn, readfn, *verifns = fnhooks
-        id_tgts = regexfinder(rom, identfn)
-        rd_tgts = regexfinder(rom, readfn)
+        id_tgts = parse_fns_thumb(rom, regexfinder(rom, identfn))
+        rd_tgts = parse_fns_thumb(rom, regexfinder(rom, readfn))
         ve_tgts = []
         for m in verifns:
           ve_tgts += regexfinder(rom, m)
+        ve_tgts = parse_fns_thumb(rom, ve_tgts)
 
         # Find the per-device functions by finding the device impl. table
         res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
@@ -535,13 +551,13 @@ def process_rom(f):
           "target-info": {
             "avail_devids": sorted(set([x["device_id"] for x in res])),
             "flash-size": flash_guess_size([x["device_id"] for x in res]),
-            "ident_addr": id_tgts,
-            "read_addr": rd_tgts,
-            "verify_addr": ve_tgts,
-            "writebyte_addr": sorted(set([x["program_byte_addr"] for x in res if "program_byte_addr" in x])),
-            "writesect_addr": sorted(set([x["program_sect_addr"] for x in res])),
-            "erasefull_addr": sorted(set([x["erase_chip_addr"] for x in res])),
-            "erasesect_addr": sorted(set([x["erase_sect_addr"] for x in res])),
+            "ident": id_tgts,
+            "read": rd_tgts,
+            "verify": ve_tgts,
+            "writebyte": parse_fns_thumb(rom, set([x["program_byte"] for x in res if "program_byte" in x])),
+            "writesect": parse_fns_thumb(rom, set([x["program_sect"] for x in res])),
+            "erasefull": parse_fns_thumb(rom, set([x["erase_chip"] for x in res])),
+            "erasesect": parse_fns_thumb(rom, set([x["erase_sect"] for x in res])),
           }
         }
 

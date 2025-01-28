@@ -294,10 +294,10 @@ def gen_waitcnt_patch(tlist, romsize, layoutinfo):
 
 def gen_eeprom_patch(eeprom_info):
   ret = []
-  for addr in eeprom_info["read_addr"]:
-    ret += gen_eeprom_opc(int(addr, 16), EEPROM_RD_HNDLR)
-  for addr in eeprom_info["write_addr"]:
-    ret += gen_eeprom_opc(int(addr, 16), EEPROM_WR_HNDLR)
+  for fn in eeprom_info["read"]:
+    ret += gen_eeprom_opc(int(fn["addr"], 16), EEPROM_RD_HNDLR)
+  for fn in eeprom_info["write"]:
+    ret += gen_eeprom_opc(int(fn["addr"], 16), EEPROM_WR_HNDLR)
   return ret
 
 def gen_rtc_patch(rtc_info):
@@ -332,25 +332,25 @@ def gen_flash_patch(flash_info):
   is128 = flash_info["subtype"].startswith("FLASH1M")
 
   # Patch the flash-ID functions to return some fixed value
-  for iaddr in flash_info["target-info"]["ident_addr"]:
+  for ifn in flash_info["target-info"]["ident"]:
     prgn = PROG_FLH128_ID if is128 else PROG_FLH64_ID
-    ret += gen_prgwr(int(iaddr, 16), prgn)
+    ret += gen_prgwr(int(ifn["addr"], 16), prgn)
 
   # Patch the flash verify function to always return 0 (verified OK)
-  for iaddr in flash_info["target-info"]["verify_addr"]:
-    ret += gen_patchfunc(int(iaddr, 16), True, False)
+  for ifn in flash_info["target-info"]["verify"]:
+    ret += gen_patchfunc(int(ifn["addr"], 16), True, False)
 
   # Emit patching info for every other routine (so that the FW can patch them)
   # with a relevant implementation (usually emulating it using SRAM).
   for pnum, addrtype in {
-    FLASH_READ_HNDLR: "read_addr",
-    FLASH_CLRC_HNDLR: "erasefull_addr",
-    FLASH_CLRS_HNDLR: "erasesect_addr",
-    FLASH_WRTS_HNDLR: "writesect_addr",
-    FLASH_WRBT_HNDLR: "writebyte_addr",
+    FLASH_READ_HNDLR: "read",
+    FLASH_CLRC_HNDLR: "erasefull",
+    FLASH_CLRS_HNDLR: "erasesect",
+    FLASH_WRTS_HNDLR: "writesect",
+    FLASH_WRBT_HNDLR: "writebyte",
   }.items():
-    for addr in flash_info["target-info"].get(addrtype, []):
-      ret += gen_flash_opc(int(addr, 16), pnum)
+    for fn in flash_info["target-info"].get(addrtype, []):
+      ret += gen_flash_opc(int(fn["addr"], 16), pnum)
 
   return ret
 
