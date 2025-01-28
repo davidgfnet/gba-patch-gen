@@ -215,6 +215,40 @@ PROGRAMS = [
   pack4(IRQ_POOL_ADDR_PATCH),
 ]
 
+# WaitCNT filtering for save routines
+# Some save routines update WAITCNT to handle SRAM WS. We can ignore these.
+def waitcnt_filter(targets):
+  # Extract all the ranges that can be "safely" ignored.
+  ranges = []
+  if "eeprom" in targets:
+    for t in ["read", "write"]:
+      for info in targets["eeprom"]["target-info"][t]:
+        ranges.append((int(info["addr"], 16), info["size"]))
+
+  if "flash" in targets:
+    for t in ["read", "ident", "verify", "erasefull", "erasesect", "writesect", "writebyte"]:
+      for info in targets["flash"]["target-info"][t]:
+        ranges.append((int(info["addr"], 16), info["size"]))
+
+  def inrange(addr16):
+    off = int(addr16, 16)
+    for st, size in ranges:
+      if off >= st and off < st+size:
+        return True
+    return False
+
+  if "waitcnt" in targets:
+    psites = []
+    for i in range(len(targets["waitcnt"]["patch-sites"])):
+      if targets["waitcnt"]["patch-sites"][i]["inst-type"] in ["str16-thumb", "str32-thumb"]:
+        # Check if we can remove this one
+        if not inrange(targets["waitcnt"]["patch-sites"][i]["inst-offset"]):
+          psites.append(targets["waitcnt"]["patch-sites"][i])
+      else:
+        psites.append(targets["waitcnt"]["patch-sites"][i])
+
+    targets["waitcnt"]["patch-sites"] = psites
+
 # WaitCNT patching.
 def gen_waitcnt_patch(tlist, romsize, layoutinfo):
   ret = []
@@ -407,6 +441,10 @@ class GamePatch(object):
     self._gamecode = gamecode
     self._gamever = gamever
     self._romsize = romsize
+
+    # Apply filtering to reduce WAITCNT patch count
+    waitcnt_filter(targets)
+
     self._waitcnt_patches = gen_waitcnt_patch(
       targets.get("waitcnt", {}).get("patch-sites", []),
       romsize,
