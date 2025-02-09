@@ -14,8 +14,7 @@
 #  - Find the location that uses it, categorize it, emit a patch.
 #  - Use the ARM emulator to find tricky code sequences (ie. ARM code)
 
-from tqdm import tqdm
-import sys, os, struct, json, hashlib, multiprocessing
+import struct, hashlib
 import arm
 
 # Actual address to look for
@@ -210,108 +209,115 @@ def check_patch_memclr2(rom, maxcheck=0x200):
       }]
   return []
 
+def process_rom(rom):
+  targets = []
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      flist.append(f)
+  # Look for good known clear seqs (usually at the start of the ROM)
+  targets += check_patch_memclr1(rom)
+  targets += check_patch_memclr2(rom)
 
-def process_rom(f):
-  with open(f, "rb") as ifd:
-    targets = []
-    rom = ifd.read()
-
-    # Look for good known clear seqs (usually at the start of the ROM)
-    targets += check_patch_memclr1(rom)
-    targets += check_patch_memclr2(rom)
-
-    for i in range(0, len(rom) & ~3, 4):
-      v = struct.unpack("<I", rom[i:i+4])[0]
-      # Find the address constant
-      if v in SUSPICIOUS_ADDRESSES:
-        str_off = TGT_ADDRESS - v
-        # Find the load instruction that uses it. Match the relevant pattern.
-        thumb_cand = find_thumb_ldr(rom, i)
-        for addr, regn in thumb_cand:
-          taddr = validate_thumb_ldr(f, rom, addr, regn, str_off)
-          if taddr:
-            if str_off != 0:
-              # Patch the instruction offset only.
-              opc = struct.unpack("<H", rom[taddr:taddr+2])[0]
-              targets.append({
-                "inst-type": "irq-thumb-str",
-                "offset": hex(taddr),
-                "inst-opcode": hex(opc),
-              })
-            else:
-              targets.append({
-                "inst-type": "irq-thumb-str",
-                "offset": hex(taddr),
-                "pool-addr": hex(i),
-              })
-
-        arm_cand = find_arm_ldr(rom, i)
-        for addr, regn in arm_cand:
-          taddr = validate_arm_ldr(rom, addr, regn, str_off)
-          if taddr:
-            if str_off != 0:
-              opc = struct.unpack("<I", rom[taddr:taddr+4])[0]
-              targets.append({
-                "inst-type": "irq-arm-str",
-                "offset": hex(taddr),
-                "inst-opcode": hex(opc),
-              })
-            else:
-              targets.append({
-                "inst-type": "irq-arm-str",
-                "offset": hex(taddr),
-                "pool-addr": hex(i),
-              })
-
-    # Do this as a second pass, since we prefer patching pool addresses.
-    for i in range(0, len(rom) & ~3, 4):
-      v = struct.unpack("<I", rom[i:i+4])[0]
-      # Found a relevant arm move instruction (mov 0x04000000)
-      if (v & MOVMASK) in MOVINST:
-        # Emulate some insts before and after hoping to capture a write
-        emustart = max(0, i - EMU_OFFSET // 2)
-        emuend   = max(0, i + EMU_OFFSET // 2)
-        for str_type, str_off in emulate_arm_insts(emustart, emuend, rom):
-          if hex(str_off) not in [x["offset"] for x in targets]:
-            opc = struct.unpack("<I", rom[str_off:str_off+4])[0]
+  for i in range(0, len(rom) & ~3, 4):
+    v = struct.unpack("<I", rom[i:i+4])[0]
+    # Find the address constant
+    if v in SUSPICIOUS_ADDRESSES:
+      str_off = TGT_ADDRESS - v
+      # Find the load instruction that uses it. Match the relevant pattern.
+      thumb_cand = find_thumb_ldr(rom, i)
+      for addr, regn in thumb_cand:
+        taddr = validate_thumb_ldr(f, rom, addr, regn, str_off)
+        if taddr:
+          if str_off != 0:
+            # Patch the instruction offset only.
+            opc = struct.unpack("<H", rom[taddr:taddr+2])[0]
             targets.append({
-              "inst-type": "irq-arm-str",
-              "offset": hex(str_off),
+              "inst-type": "irq-thumb-str",
+              "offset": hex(taddr),
               "inst-opcode": hex(opc),
             })
+          else:
+            targets.append({
+              "inst-type": "irq-thumb-str",
+              "offset": hex(taddr),
+              "pool-addr": hex(i),
+            })
+
+      arm_cand = find_arm_ldr(rom, i)
+      for addr, regn in arm_cand:
+        taddr = validate_arm_ldr(rom, addr, regn, str_off)
+        if taddr:
+          if str_off != 0:
+            opc = struct.unpack("<I", rom[taddr:taddr+4])[0]
+            targets.append({
+              "inst-type": "irq-arm-str",
+              "offset": hex(taddr),
+              "inst-opcode": hex(opc),
+            })
+          else:
+            targets.append({
+              "inst-type": "irq-arm-str",
+              "offset": hex(taddr),
+              "pool-addr": hex(i),
+            })
+
+  # Do this as a second pass, since we prefer patching pool addresses.
+  for i in range(0, len(rom) & ~3, 4):
+    v = struct.unpack("<I", rom[i:i+4])[0]
+    # Found a relevant arm move instruction (mov 0x04000000)
+    if (v & MOVMASK) in MOVINST:
+      # Emulate some insts before and after hoping to capture a write
+      emustart = max(0, i - EMU_OFFSET // 2)
+      emuend   = max(0, i + EMU_OFFSET // 2)
+      for str_type, str_off in emulate_arm_insts(emustart, emuend, rom):
+        if hex(str_off) not in [x["offset"] for x in targets]:
+          opc = struct.unpack("<I", rom[str_off:str_off+4])[0]
+          targets.append({
+            "inst-type": "irq-arm-str",
+            "offset": hex(str_off),
+            "inst-opcode": hex(opc),
+          })
 
 
-    # Dedup entries (happens with ARM code)
-    targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["offset"])
-    # Extract ROM info, such as game code
-    gcode = rom[0x0AC: 0x0B0].decode("ascii")
-    grev = rom[0x0BC]
-    return ({
-      "filename": os.path.basename(f),
-      "filesize": len(rom),
-      "sha256": hashlib.sha256(rom).hexdigest(),
-      "sha1": hashlib.sha1(rom).hexdigest(),
-      "md5": hashlib.md5(rom).hexdigest(),
-      "game-code": gcode,
-      "game-version": grev,
-      "targets": {
-        "irqhdr": {
-          "patch-sites": targets,
-        }
+  # Dedup entries (happens with ARM code)
+  targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["offset"])
+  # Extract ROM info, such as game code
+  gcode = rom[0x0AC: 0x0B0].decode("ascii")
+  grev = rom[0x0BC]
+  return ({
+    "filesize": len(rom),
+    "sha256": hashlib.sha256(rom).hexdigest(),
+    "sha1": hashlib.sha1(rom).hexdigest(),
+    "md5": hashlib.md5(rom).hexdigest(),
+    "game-code": gcode,
+    "game-version": grev,
+    "targets": {
+      "irqhdr": {
+        "patch-sites": targets,
       }
-    })
+    }
+  })
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  results = list(tqdm(p.imap(process_rom, flist), total=len(flist)))
 
-results = sorted(results, key=lambda x:x["filename"])
+# For local use
+if __name__ == "__main__":
+  import os, sys, multiprocessing, tqdm, json
 
-print(json.dumps(results, indent=2))
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        flist.append(f)
+
+  def wrapper(f):
+    finfo = {
+      "filename": os.path.basename(f),
+    }
+    return finfo | process_rom(open(f, "rb").read())
+
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    results = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
+
+  results = sorted(results, key=lambda x:x["filename"])
+
+  print(json.dumps(results, indent=2))
 

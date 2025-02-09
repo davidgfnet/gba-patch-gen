@@ -15,8 +15,7 @@
 #
 # Use pypy to run this, it's 20x faster than regular python :)
 
-from tqdm import tqdm
-import sys, os, struct, json, re, hashlib, multiprocessing
+import struct, re, hashlib
 
 # Using the longest common function start/prologue to avoid false positives
 
@@ -438,10 +437,6 @@ eeprom_savemap = {
   "gba_eeprom_64k": 8*1024,
   "gba_eeprom": 8*1024,    # No idea, assume worst case
 }
-if len(sys.argv) > 2:
-  savetypes_3p = []
-  for fn in sys.argv[2:]:
-    savetypes_3p.append(json.loads(open(fn).read()))
 
 def lookup_eeprom_size(gcode):
   for db in savetypes_3p:
@@ -449,141 +444,152 @@ def lookup_eeprom_size(gcode):
       return eeprom_savemap[db[gcode]]
   return None
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      flist.append(f)
+def process_rom(rom):
+  # Add ROM and index by gamecode/version
+  gcode = rom[0x0AC: 0x0B0].decode("ascii")
+  grev = rom[0x0BC]
 
-def process_rom(f):
-  with open(f, "rb") as ifd:
-    rom = ifd.read()
+  matches = []
+  for hay in SAVE_STRINGS.keys():
+    m = bytefinder(rom, hay)
+    if len(m) >= 1:
+      matches.append(hay)
 
-    # Add ROM and index by gamecode/version
-    gcode = rom[0x0AC: 0x0B0].decode("ascii")
-    grev = rom[0x0BC]
+  if len(matches) == 0:
+    # Try to guess if the game uses a password system?
+    if (bytefinder(rom, b"assword") or bytefinder(rom, b"ASSWORD") or
+        bytefinder(rom, b"code") or bytefinder(rom, b"CODE") or
+        bytefinder(rom, b"a\x00s\x00s\x00w\x00o\x00r\x00") or
+        bytefinder(rom, b"A\x00S\x00S\x00W\x00O\x00R\x00")):
+      pass    # Likely a game that uses passwords/codes, no save memory
+    else:
+      # print("No save found for ROM", f, file=sys.stderr)
+      pass
+    return
 
-    matches = []
-    for hay in SAVE_STRINGS.keys():
-      m = bytefinder(rom, hay)
-      if len(m) >= 1:
-        matches.append(hay)
-
-    if len(matches) == 0:
-      # Try to guess if the game uses a password system?
-      if (bytefinder(rom, b"assword") or bytefinder(rom, b"ASSWORD") or
-          bytefinder(rom, b"code") or bytefinder(rom, b"CODE") or
-          bytefinder(rom, b"a\x00s\x00s\x00w\x00o\x00r\x00") or
-          bytefinder(rom, b"A\x00S\x00S\x00W\x00O\x00R\x00")):
-        pass    # Likely a game that uses passwords/codes, no save memory
-      else:
-        # print("No save found for ROM", f, file=sys.stderr)
-        pass
-      return
-
-    elif len(matches) > 1:
-      # Certain FLASH types are compatible, so ignore those as long as they are compat
-      subvermap = {}
-      for stype in matches:
-        gentype, subver, *_ = SAVE_STRINGS[stype]
-        if gentype == "flash":
-          if gentype not in subvermap:
-            subvermap[gentype] = {}
-          subvermap[gentype][subver] = subvermap[gentype].get(subver, 0) + 1
-
-      if any(len(e) > 1 for e in subvermap.values()):
-        print("Conflicting save types", f, subvermap, file=sys.stderr)
-      elif any(c > 1 for e in subvermap.values() for c in e.values()):
-        excl_matches = sorted([m for m in matches if SAVE_STRINGS[m][0] == "flash"])[:-1]
-        matches = sorted([m for m in matches if SAVE_STRINGS[m][0] != "flash" or m not in excl_matches])
-        print("Flash type conflicts, skipping " + str(excl_matches), file=sys.stderr)
-
-    # Some games have more than one match (at least string signature)
-    # but then they might only have a correct set of routines.
-    targets = {}
+  elif len(matches) > 1:
+    # Certain FLASH types are compatible, so ignore those as long as they are compat
+    subvermap = {}
     for stype in matches:
-      gentype, subver, *fnhooks = SAVE_STRINGS[stype]
+      gentype, subver, *_ = SAVE_STRINGS[stype]
+      if gentype == "flash":
+        if gentype not in subvermap:
+          subvermap[gentype] = {}
+        subvermap[gentype][subver] = subvermap[gentype].get(subver, 0) + 1
 
-      # Go ahead and find the relevan routine for this save type
-      if gentype == "sram":
-        # Mark this as an SRAM ROM so we don't apply patches but still save
-        targets["sram"] = {}
-      elif gentype == "eeprom":
-        # Find the offsets for the patchable functions
-        readfn, writefn = fnhooks
-        rd_tgts = regexfinder(rom, readfn)
-        wr_tgts = regexfinder(rom, writefn)
+    if any(len(e) > 1 for e in subvermap.values()):
+      print("Conflicting save types", f, subvermap, file=sys.stderr)
+    elif any(c > 1 for e in subvermap.values() for c in e.values()):
+      excl_matches = sorted([m for m in matches if SAVE_STRINGS[m][0] == "flash"])[:-1]
+      matches = sorted([m for m in matches if SAVE_STRINGS[m][0] != "flash" or m not in excl_matches])
+      print("Flash type conflicts, skipping " + str(excl_matches), file=sys.stderr)
 
-        # Only include the patch if it has both types
-        if rd_tgts and wr_tgts:
-          assert "eeprom" not in targets
-          targets["eeprom"] = {
-            "subtype": stype.decode("ascii"),
-            "target-info": {
-              "read": parse_fns_thumb(rom, rd_tgts),
-              "write": parse_fns_thumb(rom, wr_tgts),
-            }
-          }
-          guessed_size = lookup_eeprom_size(gcode)
-          if guessed_size:
-            targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
-      elif gentype == "flash":
-        # Ident flash and read functions are found using the regular method!
-        identfn, readfn, *verifns = fnhooks
-        id_tgts = parse_fns_thumb(rom, regexfinder(rom, identfn))
-        rd_tgts = parse_fns_thumb(rom, regexfinder(rom, readfn))
-        ve_tgts = []
-        for m in verifns:
-          ve_tgts += regexfinder(rom, m)
-        ve_tgts = parse_fns_thumb(rom, ve_tgts)
+  # Some games have more than one match (at least string signature)
+  # but then they might only have a correct set of routines.
+  targets = {}
+  for stype in matches:
+    gentype, subver, *fnhooks = SAVE_STRINGS[stype]
 
-        # Find the per-device functions by finding the device impl. table
-        res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
-        res1 = [flash_unpack_v2(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v2.finditer(rom)]
+    # Go ahead and find the relevan routine for this save type
+    if gentype == "sram":
+      # Mark this as an SRAM ROM so we don't apply patches but still save
+      targets["sram"] = {}
+    elif gentype == "eeprom":
+      # Find the offsets for the patchable functions
+      readfn, writefn = fnhooks
+      rd_tgts = regexfinder(rom, readfn)
+      wr_tgts = regexfinder(rom, writefn)
 
-        # Filter out false positives, since the regex is not perfect
-        res = [x for x in (res0 + res1) if x is not None]
-
-        assert "flash" not in targets
-        targets["flash"] = {
+      # Only include the patch if it has both types
+      if rd_tgts and wr_tgts:
+        assert "eeprom" not in targets
+        targets["eeprom"] = {
           "subtype": stype.decode("ascii"),
           "target-info": {
-            "avail_devids": sorted(set([x["device_id"] for x in res])),
-            "flash-size": flash_guess_size([x["device_id"] for x in res]),
-            "ident": id_tgts,
-            "read": rd_tgts,
-            "verify": ve_tgts,
-            "writebyte": parse_fns_thumb(rom, set([x["program_byte"] for x in res if "program_byte" in x])),
-            "writesect": parse_fns_thumb(rom, set([x["program_sect"] for x in res])),
-            "erasefull": parse_fns_thumb(rom, set([x["erase_chip"] for x in res])),
-            "erasesect": parse_fns_thumb(rom, set([x["erase_sect"] for x in res])),
+            "read": parse_fns_thumb(rom, rd_tgts),
+            "write": parse_fns_thumb(rom, wr_tgts),
           }
         }
+        guessed_size = lookup_eeprom_size(gcode)
+        if guessed_size:
+          targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
+    elif gentype == "flash":
+      # Ident flash and read functions are found using the regular method!
+      identfn, readfn, *verifns = fnhooks
+      id_tgts = parse_fns_thumb(rom, regexfinder(rom, identfn))
+      rd_tgts = parse_fns_thumb(rom, regexfinder(rom, readfn))
+      ve_tgts = []
+      for m in verifns:
+        ve_tgts += regexfinder(rom, m)
+      ve_tgts = parse_fns_thumb(rom, ve_tgts)
 
-    # If a game has only SRAM, mark is as an sram game.
-    if all(x == "sram" for x in targets):
-      targets = {"sram": {}}
-    else:
-      # We can have both EEPROM and FLASH sometimes, so we keep both patch-sets
-      targets = {k:v for k,v in targets.items() if k != "sram"}
+      # Find the per-device functions by finding the device impl. table
+      res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
+      res1 = [flash_unpack_v2(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v2.finditer(rom)]
 
-    return ({
+      # Filter out false positives, since the regex is not perfect
+      res = [x for x in (res0 + res1) if x is not None]
+
+      assert "flash" not in targets
+      targets["flash"] = {
+        "subtype": stype.decode("ascii"),
+        "target-info": {
+          "avail_devids": sorted(set([x["device_id"] for x in res])),
+          "flash-size": flash_guess_size([x["device_id"] for x in res]),
+          "ident": id_tgts,
+          "read": rd_tgts,
+          "verify": ve_tgts,
+          "writebyte": parse_fns_thumb(rom, set([x["program_byte"] for x in res if "program_byte" in x])),
+          "writesect": parse_fns_thumb(rom, set([x["program_sect"] for x in res])),
+          "erasefull": parse_fns_thumb(rom, set([x["erase_chip"] for x in res])),
+          "erasesect": parse_fns_thumb(rom, set([x["erase_sect"] for x in res])),
+        }
+      }
+
+  # If a game has only SRAM, mark is as an sram game.
+  if all(x == "sram" for x in targets):
+    targets = {"sram": {}}
+  else:
+    # We can have both EEPROM and FLASH sometimes, so we keep both patch-sets
+    targets = {k:v for k,v in targets.items() if k != "sram"}
+
+  return ({
+    "filesize": len(rom),
+    "sha256": hashlib.sha256(rom).hexdigest(),
+    "sha1": hashlib.sha1(rom).hexdigest(),
+    "md5": hashlib.md5(rom).hexdigest(),
+    "game-code": gcode,
+    "game-version": grev,
+    "targets": targets
+  })
+
+# For local use
+if __name__ == "__main__":
+  import os, sys, multiprocessing, tqdm, json
+
+  if len(sys.argv) > 2:
+    savetypes_3p = []
+    for fn in sys.argv[2:]:
+      savetypes_3p.append(json.loads(open(fn).read()))
+
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        flist.append(f)
+
+  def wrapper(f):
+    finfo = {
       "filename": os.path.basename(f),
-      "filesize": len(rom),
-      "sha256": hashlib.sha256(rom).hexdigest(),
-      "sha1": hashlib.sha1(rom).hexdigest(),
-      "md5": hashlib.md5(rom).hexdigest(),
-      "game-code": gcode,
-      "game-version": grev,
-      "targets": targets
-    })
+    }
+    return finfo | process_rom(open(f, "rb").read())
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  patches = list(tqdm(p.imap(process_rom, flist), total=len(flist)))
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    patches = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
-patches = filter(lambda x: x, patches)
-patches = sorted(patches, key=lambda x:x["filename"])
+  patches = filter(lambda x: x, patches)
+  patches = sorted(patches, key=lambda x:x["filename"])
 
-print(json.dumps(patches, indent=2))
+  print(json.dumps(patches, indent=2))
 

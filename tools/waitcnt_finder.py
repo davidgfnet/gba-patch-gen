@@ -21,9 +21,7 @@
 #  - Handle branching using backtracking and ABI convention for function calls.
 #  - Mark the stores as patch sites, so they can be nop-ified.
 
-
-from tqdm import tqdm
-import sys, os, struct, json, hashlib, multiprocessing
+import struct, hashlib
 import arm
 
 EMU_OFFSET     = 2048             # Some reasonable amount
@@ -108,74 +106,81 @@ def emulate_arm_insts(start, end, rom):
 
   return [(t, a - ROM_ADDR) for t, a in ex.execute()]
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      flist.append(f)
+def process_rom(rom):
+  targets = []
+  for i in range(0, len(rom) & ~3, 4):
+    v = struct.unpack("<I", rom[i:i+4])[0]
+    # Checks for a wide range of constants.
+    if v >= 0x04000000 and v <= 0x04000208 and (v & 1) == 0:
+      # Emulate some code before this pool constant
+      # (also a bit after, since sometimes the value is used right after!)
+      emustart_thb = max(0, i - EMU_OFFSET_THB)
+      emustart_arm = max(0, i - EMU_OFFSET_ARM)
+      emuend = min(i + EMU_OFFSET_EX, len(rom))
+      # No idea what kind of code we found: assume thumb
+      for str_type, str_off in emulate_thumb_insts(emustart_thb, emuend, rom):
+        targets.append({
+          "inst-type": "%s-thumb" % str_type,
+          "inst-offset": hex(str_off),
+        })
+      # Do the same but with ARM code now
+      for str_type, str_off in emulate_arm_insts(emustart_arm, emuend, rom):
+        targets.append({
+          "inst-type": "%s-arm" % str_type,
+          "inst-offset": hex(str_off),
+        })
 
-def process_rom(f):
-  with open(f, "rb") as ifd:
-    targets = []
-    rom = ifd.read()
-    for i in range(0, len(rom) & ~3, 4):
-      v = struct.unpack("<I", rom[i:i+4])[0]
-      # Checks for a wide range of constants.
-      if v >= 0x04000000 and v <= 0x04000208 and (v & 1) == 0:
-        # Emulate some code before this pool constant
-        # (also a bit after, since sometimes the value is used right after!)
-        emustart_thb = max(0, i - EMU_OFFSET_THB)
-        emustart_arm = max(0, i - EMU_OFFSET_ARM)
-        emuend = min(i + EMU_OFFSET_EX, len(rom))
-        # No idea what kind of code we found: assume thumb 
-        for str_type, str_off in emulate_thumb_insts(emustart_thb, emuend, rom):
-          targets.append({
-            "inst-type": "%s-thumb" % str_type,
-            "inst-offset": hex(str_off),
-          })
-        # Do the same but with ARM code now
-        for str_type, str_off in emulate_arm_insts(emustart_arm, emuend, rom):
-          targets.append({
-            "inst-type": "%s-arm" % str_type,
-            "inst-offset": hex(str_off),
-          })
+    # Found a relevant arm move instruction (mov 0x04000000)
+    if (v & MOVMASK) in MOVINST:
+      # Emulate some insts before and after hoping to capture a write
+      emustart = max(0, i - EMU_OFFSET // 2)
+      emuend   = max(0, i + EMU_OFFSET // 2)
+      for str_type, str_off in emulate_arm_insts(emustart, emuend, rom):
+        targets.append({
+          "inst-type": "%s-arm" % str_type,
+          "inst-offset": hex(str_off),
+        })
 
-      # Found a relevant arm move instruction (mov 0x04000000)
-      if (v & MOVMASK) in MOVINST:
-        # Emulate some insts before and after hoping to capture a write
-        emustart = max(0, i - EMU_OFFSET // 2)
-        emuend   = max(0, i + EMU_OFFSET // 2)
-        for str_type, str_off in emulate_arm_insts(emustart, emuend, rom):
-          targets.append({
-            "inst-type": "%s-arm" % str_type,
-            "inst-offset": hex(str_off),
-          })
-
-    # Dedup entries (happens with ARM code)
-    targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["inst-offset"])
-    # Extract ROM info, such as game code
-    gcode = rom[0x0AC: 0x0B0].decode("ascii")
-    grev = rom[0x0BC]
-    return ({
-      "filename": os.path.basename(f),
-      "filesize": len(rom),
-      "sha256": hashlib.sha256(rom).hexdigest(),
-      "sha1": hashlib.sha1(rom).hexdigest(),
-      "md5": hashlib.md5(rom).hexdigest(),
-      "game-code": gcode,
-      "game-version": grev,
-      "targets": {
-        "waitcnt": {
-          "patch-sites": targets,
-        }
+  # Dedup entries (happens with ARM code)
+  targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["inst-offset"])
+  # Extract ROM info, such as game code
+  gcode = rom[0x0AC: 0x0B0].decode("ascii")
+  grev = rom[0x0BC]
+  return ({
+    "filesize": len(rom),
+    "sha256": hashlib.sha256(rom).hexdigest(),
+    "sha1": hashlib.sha1(rom).hexdigest(),
+    "md5": hashlib.md5(rom).hexdigest(),
+    "game-code": gcode,
+    "game-version": grev,
+    "targets": {
+      "waitcnt": {
+        "patch-sites": targets,
       }
-    })
+    }
+  })
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  results = list(tqdm(p.imap(process_rom, flist), total=len(flist)))
+# For local use
+if __name__ == "__main__":
+  import os, sys, multiprocessing, tqdm, json
 
-results = sorted(results, key=lambda x:x["filename"])
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        flist.append(f)
 
-print(json.dumps(results, indent=2))
+  def wrapper(f):
+    finfo = {
+      "filename": os.path.basename(f),
+    }
+    return finfo | process_rom(open(f, "rb").read())
+
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    results = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
+
+  results = sorted(results, key=lambda x:x["filename"])
+
+  print(json.dumps(results, indent=2))
 

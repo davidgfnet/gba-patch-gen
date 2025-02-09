@@ -11,8 +11,7 @@
 #
 # Use pypy to run this, it's 20x faster than regular python :)
 
-from tqdm import tqdm
-import sys, os, struct, json, re, hashlib, multiprocessing
+import struct, re, hashlib
 
 # Having some issues with regexes and overlapping matches and whatnot
 def match_insts(data, mseq):
@@ -115,56 +114,68 @@ RTC_STRING = b"SIIRTC_V001"
 def regexfinder(buf, seq):
   return [hex(x) for x in match_insts(buf, seq)]
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      flist.append(f)
+def process_rom(rom):
+  # Add ROM and index by gamecode/version
+  gcode = rom[0x0AC: 0x0B0].decode("ascii")
+  grev = rom[0x0BC]
 
-def process_rom(f):
-  with open(f, "rb") as ifd:
-    rom = ifd.read()
+  if RTC_STRING not in rom:
+    return None
 
-    # Add ROM and index by gamecode/version
-    gcode = rom[0x0AC: 0x0B0].decode("ascii")
-    grev = rom[0x0BC]
+  probe_tgt = regexfinder(rom, siirtc_probe_fn)
+  getst_tgt = regexfinder(rom, siirtc_getstatus_fn)
+  gettd_tgt = regexfinder(rom, siirtc_getdatetime_fn)
+  reset_tgt = regexfinder(rom, siirtc_reset_fn)
+  if len(probe_tgt) != 1 or len(getst_tgt) != 1 or len(gettd_tgt) != 1 or len(reset_tgt) != 1:
+    return None
 
-    if RTC_STRING not in rom:
+  targets = {
+    "probe_fn": probe_tgt[0],
+    "getstatus_fn": getst_tgt[0],
+    "gettimedate_fn": gettd_tgt[0],
+    "reset_fn": reset_tgt[0],
+  }
+
+  return ({
+    "filesize": len(rom),
+    "sha256": hashlib.sha256(rom).hexdigest(),
+    "sha1": hashlib.sha1(rom).hexdigest(),
+    "md5": hashlib.md5(rom).hexdigest(),
+    "game-code": gcode,
+    "game-version": grev,
+    "targets": {
+      "rtc": targets
+    }
+  })
+
+
+
+# For local use
+if __name__ == "__main__":
+  import os, sys, multiprocessing, tqdm, json
+
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        flist.append(f)
+
+  def wrapper(f):
+    ret = process_rom(open(f, "rb").read())
+    if ret is None:
       return None
 
-    probe_tgt = regexfinder(rom, siirtc_probe_fn)
-    getst_tgt = regexfinder(rom, siirtc_getstatus_fn)
-    gettd_tgt = regexfinder(rom, siirtc_getdatetime_fn)
-    reset_tgt = regexfinder(rom, siirtc_reset_fn)
-    assert len(probe_tgt) == 1 and len(getst_tgt) == 1
-    assert len(gettd_tgt) == 1 and len(reset_tgt) == 1
-
-    targets = {
-      "probe_fn": probe_tgt[0],
-      "getstatus_fn": getst_tgt[0],
-      "gettimedate_fn": gettd_tgt[0],
-      "reset_fn": reset_tgt[0],
-    }
-
-    return ({
+    finfo = {
       "filename": os.path.basename(f),
-      "filesize": len(rom),
-      "sha256": hashlib.sha256(rom).hexdigest(),
-      "sha1": hashlib.sha1(rom).hexdigest(),
-      "md5": hashlib.md5(rom).hexdigest(),
-      "game-code": gcode,
-      "game-version": grev,
-      "targets": {
-        "rtc": targets
-      }
-    })
+    }
+    return ret | finfo
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  patches = list(tqdm(p.imap(process_rom, flist), total=len(flist)))
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    patches = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
-patches = filter(lambda x: x, patches)
-patches = sorted(patches, key=lambda x:x["filename"])
+  patches = filter(lambda x: x, patches)
+  patches = sorted(patches, key=lambda x:x["filename"])
 
-print(json.dumps(patches, indent=2))
+  print(json.dumps(patches, indent=2))
 
