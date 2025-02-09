@@ -22,7 +22,7 @@
 #  - Mark the stores as patch sites, so they can be nop-ified.
 
 import struct, hashlib
-import arm
+import patchtool.arm as arm
 
 EMU_OFFSET     = 2048             # Some reasonable amount
 EMU_OFFSET_THB = 2048             # Captures all thumb loads

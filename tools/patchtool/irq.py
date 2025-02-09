@@ -15,7 +15,7 @@
 #  - Use the ARM emulator to find tricky code sequences (ie. ARM code)
 
 import struct, hashlib
-import arm
+import patchtool.arm as arm
 
 # Actual address to look for
 TGT_ADDRESS = 0x03007FFC
