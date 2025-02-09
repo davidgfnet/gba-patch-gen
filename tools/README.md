@@ -46,14 +46,16 @@ Some tools are provided to manage patch information:
    patches. The merge might fail if contradictory information exists in some
    cases.
 
-The actual patch generation is provided by patch-gen.py. Given a single full
+The actual patch generation is provided by patch\_gen.py. Given a single full
 patch (produced by the merge tool) generates the actual patching data, making
 some decisions on how each relevant patch sites are handled. Roughly:
 
  - Patching WAITCNT updates with NOP instructions.
  - Patching SWI 0x1 with branches to an emulation routine.
  - Adding some extra code to handle the above mentioned SWI.
+ - Patching IRQ handlers sites to point to 0x03007FF4.
  - Patching some FLASH routines.
  - Encoding some FLASH/EEPROM routines (for the firmware to patch).
+ - Encoding RTC routines.
 
 
