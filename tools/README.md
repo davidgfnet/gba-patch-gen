@@ -39,7 +39,7 @@ Here there's a collection of tools for patch generation.
 
 Some tools are provided to manage patch information:
 
- * patch-merge.py: Merges a set of patches (of different types) and produces a
+ * patch\_merge.py: Merges a set of patches (of different types) and produces a
    single file with all the patch information. This script indexes patches on
    game code and version, trying to reconcile any "duplicated" ROMs (like
    variants or patched versions / minor revisions) as well as compatible
