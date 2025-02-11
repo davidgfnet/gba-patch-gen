@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+  <head>
+      <title>GBA patch tool for SuperFW - davidgf.net</title>
+      <script src="js/pyodide.js"></script>
+      <link href="css/bootstrap.min.css" rel="stylesheet">
+      <link href="css/custom.css" rel="stylesheet">
+  </head>
+  <body class="text-center">
+
+    <main class="main-class rounded rounded-3 shadow">
+      <div class="mb-4 headimg">
+        <img src="img/superfw-logo.svg" />
+      </div>
+
+      <h1 class="h3 mb-5 fw-normal">GBA ROM patch generation</h1>
+
+      <div id="inpf">
+        <div>
+          <label class="filebox-label" for="filebox">Pick a GBA rom file:</label>
+          <input type="file" id="filebox" class="form-control" name="filebox" accept="octet/stream" />
+        </div>
+
+        <button type="button" class="btn btn-secondary mb-4" id="toggleAdvOn">
+          Advanced &#x25be;
+        </button>
+
+        <button type="button" class="btn btn-secondary mb-4 advanced-options" id="toggleAdvOff">
+          Advanced &#x25b4;
+        </button>
+
+        <!-- Advanced Options Section (Initially Hidden) -->
+        <div class="advanced-options" id="advancedOptions">
+          <div class="checkbox">
+            <input type="checkbox" id="p-save" name="p-save" checked />
+            Save patches
+          </div>
+          <div class="checkbox">
+            <input type="checkbox" id="p-irq" name="p-irq" checked />
+            IRQ patches (for In-game menu)
+          </div>
+        </div>
+
+        <div>
+          <button id="mainb" class="w-100 btn btn-lg btn-primary" type="submit">Generate patches</button>
+        </div>
+      </div>
+
+      <div id="outf" class="d-none">
+        <div id="status" class="mb-4">
+        </div>
+
+        <div class="mb-4 d-none" id="downb">
+          <button class="btn btn-danger" id="resetb">Upload new ROM</button>
+          <a class="w-50 btn btn-secondary" id="downbut" href="#">Download patch</a>
+        </div>
+      </div>
+
+    </main>
+
+    <script type="text/javascript" src="js/app.js"></script>
+  </body>
+</html>
+
