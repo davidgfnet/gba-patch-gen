@@ -138,12 +138,12 @@ SWI1_WAITCNT_THUMB_PG = [
 ]
 
 SWI1_WAITCNT_ARM_PG = [
-  0xe3a01301, # mov r2, #0x04000000
-  0xe5912204, # ldr r1, [r2, #0x204]
+  0xe3a02301, # mov r2, #0x04000000
+  0xe5921204, # ldr r1, [r2, #0x204]
   0xe52d1004, # push {r1}
   0xef010000, # svc 0x00010000
   0xe49d0004, # pop {r0}
-  0xe3a01301, # mov	r1, #0x04000000
+  0xe3a01301, # mov r1, #0x04000000
   0xe5810204, # str r0, [r1, #0x204]
   0xe12fff1e, # bx lr
 ]
@@ -235,7 +235,7 @@ def gen_waitcnt_patch(tlist, romsize, layoutinfo):
       subh = layoutinfo.get("subheaders", [])
       if tpad > MIN_TAILSPACE:
         # Place it at the end of the rom, since it seems padding space
-        swi1_hdl_offset = romsize - len(PROGRAMS[PROG_SWI1_EMU])
+        swi1_hdl_offset = romsize - len(PROGRAMS[PROG_SWI1_EMU]) - 8
       elif subh:
         # Try place it at some internal header (usually 2in1 games)
         swi1_hdl_offset = subh[0] + 4   # Use the logo space, nobody checks it here
