@@ -68,7 +68,10 @@ async function main() {
       // Generate binary patch in .patch format (not a PatchDB!)
       if (pbin.result == "ok") {
         var pbuf = Uint8Array.fromHex(pbin.data);
-        const f = new File([pbuf], 'file.patch', { type: "octet/stream" });
+        var fname = document.getElementById("filebox").files[0].name;
+        var bname = fname.lastIndexOf('.') < 0 ? fname : fname.substring(0, fname.lastIndexOf('.'));
+
+        const f = new File([pbuf], bname + '.patch', { type: "octet/stream" });
         const u = URL.createObjectURL(f);
         document.getElementById('downbut').href = u;
 
