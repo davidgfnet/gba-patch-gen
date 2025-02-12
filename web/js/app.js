@@ -150,7 +150,13 @@ async function main() {
                              len(gp.irq_patches()),
                              len(gp.rtc_patches()),
                              hinfo)
+
+          for prgn in range(4):
+            prg = patchtool.generator.PROGRAMS[prgn]
+            hdr += struct.pack("<I", len(prg)) + prg + (b"\\x00" * (60 - len(prg)))
+
           content = b"".join(struct.pack("<I", x) for x in gp.waitcnt_patches() + gp.save_patches() + gp.irq_patches() + gp.rtc_patches())
+          content += (b"\\x00" * (512 - len(content)))
           pload = "".join("%02x" % x for x in hdr + content)
           response = {"result": "ok", "data": pload}
         except Exception as e:
