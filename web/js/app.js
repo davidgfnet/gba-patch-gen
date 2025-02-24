@@ -1,6 +1,18 @@
 
 // Copyright 2025 David Guillen Fandos <david@davidgf.net>
 
+function Uint8ArrayfromHex(s) {
+  if (s.length % 2 !== 0) {
+    throw "Even num of chars required";
+  }
+  var blen = s.length / 2;
+  var ret = new Uint8Array(blen);
+  for (var i = 0; i < blen; i++) {
+    ret[i] = parseInt(s.substr(i*2, 2), 16);
+  }
+  return ret;
+}
+
 var pyodide = null;
 async function main() {
   async function loadpy() {
@@ -67,7 +79,7 @@ async function main() {
 
       // Generate binary patch in .patch format (not a PatchDB!)
       if (pbin.result == "ok") {
-        var pbuf = Uint8Array.fromHex(pbin.data);
+        var pbuf = Uint8ArrayfromHex(pbin.data);
         var fname = document.getElementById("filebox").files[0].name;
         var bname = fname.lastIndexOf('.') < 0 ? fname : fname.substring(0, fname.lastIndexOf('.'));
 
