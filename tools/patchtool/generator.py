@@ -99,12 +99,19 @@ def gen_flash_opc(addr, typenum):
   assert (addr & ~0x1FFFFFF) == 0
   return [ (OPC_FLASH_HD << 28) | (typenum << 25) | addr ]
 
-def encode_arm_bl(inst_addr, target_addr):
+def encode_arm_b(inst_addr, target_addr):
   assert target_addr % 4 == 0 and inst_addr % 4 == 0
   off = (target_addr - (inst_addr + 8)) // 4
   if off >= (1 << 23) or off < -(1 << 23):
     return None
   return 0xEA000000 | (off & 0xFFFFFF)
+
+def encode_arm_bl(inst_addr, target_addr):
+  assert target_addr % 4 == 0 and inst_addr % 4 == 0
+  off = (target_addr - (inst_addr + 8)) // 4
+  if off >= (1 << 23) or off < -(1 << 23):
+    return None
+  return 0xEB000000 | (off & 0xFFFFFF)
 
 def encode_thumb_bl(inst_addr, target_addr):
   assert target_addr % 2 == 0 and inst_addr % 2 == 0
@@ -292,8 +299,8 @@ def gen_waitcnt_patch(tlist, romsize, layoutinfo):
   # Emit a trampoline (2+1 insts) in the gametitle.
   for off in patch_gametitle:
     ret += gen_cpywords(off, [
-      0x47084679,   # mov r1, pc + bx r1
-      encode_arm_bl(off + 4, swi1_hdl_offset + SWI1_WAITCNT_PG_ARM_OFF)  # BL (ARM mode)
+      0x47084679,   # mov r1, pc + bx r1 (thumb)
+      encode_arm_b(off + 4, swi1_hdl_offset + SWI1_WAITCNT_PG_ARM_OFF)  # B (ARM mode)
     ])
 
   return ret
