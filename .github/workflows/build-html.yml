@@ -19,10 +19,15 @@ jobs:
         run: sudo apt-get install -y python3-wheel
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Get short SHA
+        id: slug
+        run: echo "sha8=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_ENV
       - name: Prepare build
         run: mkdir build
       - name: Build and install wheel package
         run: mkdir -p web/py && cd tools && python3 setup.py bdist_wheel && cp dist/*.whl ../web/py/
+      - name: Tag html with git version
+        run: sed -i "s/{{GITVERSION}}/${{ env.sha8 }}/g" web/index.html
       - name: Upload generated webapp
         uses: actions/upload-pages-artifact@v3
         with:
