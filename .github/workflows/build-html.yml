@@ -28,6 +28,8 @@ jobs:
         run: mkdir -p web/py && cd tools && python3 setup.py bdist_wheel && cp dist/*.whl ../web/py/
       - name: Tag html with git version
         run: sed -i "s/{{GITVERSION}}/${{ env.sha8 }}/g" web/index.html
+      - name: Add tracking code
+        run: sed -i "s/<\!--Here goes tracking JS-->/<script async src=\"https:\/\/www.googletagmanager.com\/gtag\/js?id=G-3K5DTQ9DMQ\"><\/script><script>window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-3K5DTQ9DMQ');<\/script>/g" web/index.html
       - name: Upload generated webapp
         uses: actions/upload-pages-artifact@v3
         with:
