@@ -74,6 +74,7 @@ def process_rom(rom):
         break
     holes.append((i, j-i))
     i = j
+  i = 0
   while True:
     i = rom[:-tailspace].find(b'\xff' * 128 * 1024, i)
     if i < 0:
