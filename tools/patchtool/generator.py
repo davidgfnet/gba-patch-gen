@@ -336,8 +336,24 @@ def gen_layout_patch(layout_info, romsize):
         assert addr < 32*1024*1024
         # Simply emit address (multiple of 1024) and size (in KB as well)
         w = (gap_size >> 10) | ((addr >> 10) << 16)
-        ret.append(w)
-  return ret
+        ret.append((gap_size, w))
+
+  if "holes" in layout_info:
+    # Find the biggest hole we can use
+    if len(layout_info["holes"]) > 0:
+      bh = sorted(layout_info["holes"], key=lambda x: -x[1])[0]
+      # Add some arbitrary padding guard (to ensure we do not overwrite game data)
+      addr = (bh[0] + 8*1024) & (~1023)
+      gap_size = (bh[1] - 16*1024) & (~1023)
+      w = (gap_size >> 10) | ((addr >> 10) << 16)
+      ret.append((gap_size, w))
+
+  # Pick the biggest candidate
+  # TODO: add multi-hole support
+  ret = sorted(ret, key=lambda x: -x[0])
+  if ret:
+    return [ ret[0][1] ]
+  return []
 
 def gen_flash_patch(flash_info):
   ret = []
