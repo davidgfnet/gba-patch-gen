@@ -1,0 +1,35 @@
+[
+  {
+    "game-code": "AW2E",
+    "game-version": 0,
+    "info-name": "Advance Wars 2 - Black Hole Rising (USA)",
+    "description": "AW2 has a race condition triggered when running at a lower speed. We simply optimize the main routine to save some cycles",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x2f1d8",
+            "inst-patchvs": "0x81168016,0x3c023210,0x46c0ddfa"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "game-code": "AW2P",
+    "game-version": 0,
+    "info-name": "Advance Wars 2 - Black Hole Rising (Europe)",
+    "targets": {
+      "waitcnt": {
+        "patch-sites": [
+          {
+            "inst-type":   "word32",
+            "inst-offset": "0x2f434",
+            "inst-patchvs": "0x81168016,0x3c023210,0x46c0ddfa"
+          }
+        ]
+      }
+    }
+  }
+]

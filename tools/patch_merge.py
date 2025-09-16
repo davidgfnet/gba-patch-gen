@@ -11,7 +11,7 @@
 WAITCNT_PATCH_TYPES = frozenset([
   "str8-thumb", "str16-thumb", "str32-thumb",
   "str8-arm", "str16-arm", "str32-arm",
-  "word32",
+  "word16", "word32",
   "swi1-arm", "swi1-bl-thumb"
 ])
 

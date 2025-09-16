@@ -261,9 +261,15 @@ def gen_waitcnt_patch(tlist, romsize, layoutinfo):
       ret += gen_thumbnop(int(t["inst-offset"], 16))
     elif re.match("str[0-9]+-arm", t["inst-type"]):
       ret += gen_armnop(int(t["inst-offset"], 16))
-    elif t["inst-type"] == "word32":
+    elif t["inst-type"] == "word16":
       value = int(t["inst-patchv"], 16)
-      ret += gen_cpywords(int(t["inst-offset"], 16), [value])
+      ret += gen_cpyhalfword(int(t["inst-offset"], 16), value)
+    elif t["inst-type"] == "word32":
+      if "inst-patchv" in t:
+        values = [int(t["inst-patchv"], 16)]
+      else:
+        values = [int(x, 16) for x in t["inst-patchvs"].split(",")]
+      ret += gen_cpywords(int(t["inst-offset"], 16), values)
 
     # For SWI patching (if required) place a SWI1 handler at the end of the ROM.
     elif re.match("swi1.*", t["inst-type"]):
