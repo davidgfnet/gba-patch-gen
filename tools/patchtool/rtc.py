@@ -111,8 +111,15 @@ siirtc_reset_fn = [
 RTC_STRING = b"SIIRTC_V001"
 
 # Finds all matches for a buffer and a substring
+def find_bx(rom, start):
+  while True:
+    inst = struct.unpack("<H", rom[start:start+2])[0]
+    if (inst & 0xFF07) == 0x4700:
+      return start
+    start += 2
+
 def regexfinder(buf, seq):
-  return [hex(x) for x in match_insts(buf, seq)]
+  return [{"addr": hex(x), "size": find_bx(buf, x) + 2 - x} for x in match_insts(buf, seq)]
 
 def process_rom(rom):
   # Add ROM and index by gamecode/version
