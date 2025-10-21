@@ -1,0 +1,1510 @@
+[
+  {
+    "filename": "Boktai - The Sun Is in Your Hand (Europe) (En,Fr,De,Es,It).gba",
+    "filesize": 16777216,
+    "game-code": "U3IP",
+    "game-version": 0,
+    "md5": "c8b49c53003b8d9a15d91a5a5d5cc91b",
+    "sha1": "64f7bf0f0560f6e94da33b549d3206678b29f557",
+    "sha256": "214285b09200848d5f8639a688051a627ec4aa648e078ad6d77579633822dd6c",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1d36a0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1d3814",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1d3544",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1d361c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Boktai - The Sun Is in Your Hand (USA) (Sample).gba",
+    "filesize": 16777216,
+    "game-code": "A3IJ",
+    "game-version": 224,
+    "md5": "5eed126956c06a047b7098e0facd7067",
+    "sha1": "f91126cd3a1bf7bf5f770d3a70229171d0d5a6ee",
+    "sha256": "ecfc68885942fab16a03a13ffe3da74a3d596a9692be2ef9a9ce9f95756ff8e9",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1a9fa0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1aa114",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1a9e44",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1a9f1c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Boktai - The Sun Is in Your Hand (USA).gba",
+    "filesize": 16777216,
+    "game-code": "U3IE",
+    "game-version": 0,
+    "md5": "ff75c62ab690410cc8fca24204d783e9",
+    "sha1": "7164326283df46a3941ec7b6ceca889cbc40e660",
+    "sha256": "aad4eaf0b3ab9f80ffb3a5346d6607b2e2ea12f8e5f3851d2edd1306a4f7a8cd",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1d89b8",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1d8b2c",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1d885c",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1d8934",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Boktai 2 - Solar Boy Django (Europe) (En,Fr,De,Es,It).gba",
+    "filesize": 16777216,
+    "game-code": "U32P",
+    "game-version": 0,
+    "md5": "66c0b2e21872f8e9af56292d881c1516",
+    "sha1": "eeacdf5a9d3d2173a4a96689b72dc6b7ad92153c",
+    "sha256": "8a8cc80b597fa30f0792fd0d7e9b006552e4dbcf521b025563be268f7a2351d9",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x25279c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x252910",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x252640",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x252718",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Boktai 2 - Solar Boy Django (USA).gba",
+    "filesize": 16777216,
+    "game-code": "U32E",
+    "game-version": 0,
+    "md5": "31231965d6a43d935e3629a67e06e0bb",
+    "sha1": "cd10d8ed82f4daf4072774f70d015e39a5d32d0b",
+    "sha256": "b51b6c667f4ff78f2e1462f8280af2e96e55fe872efdc85ecfc152f7c34e2483",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x24d000",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x24d174",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x24cea4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x24cf7c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Bokura no Taiyou - Taiyou Action RPG (Japan).gba",
+    "filesize": 16777216,
+    "game-code": "U3IJ",
+    "game-version": 0,
+    "md5": "9f1c1202ed1d856c5836cee6818a171e",
+    "sha1": "c51ad84e9403db94cd18a14ac72f8367b52a0d7f",
+    "sha256": "6a0c358516567e10a5d5692ee26cf59a54dab71f9c4aab98d22766c18de2649c",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1d7110",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1d7284",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1d6fb4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1d708c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Legendz - Buhwarhaneun Siryeonyi Seom (Korea).gba",
+    "filesize": 8388608,
+    "game-code": "BLJK",
+    "game-version": 0,
+    "md5": "1c2da9f487a4834c8021d7a307a55684",
+    "sha1": "b074cff4a2a281d4602b85b9211574cbf4408a31",
+    "sha256": "2f3fa0d68c38d5a3e8b40041e7c58501c54f3a09761b5cf51cecdaf62fed317d",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0xe4014",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0xe4188",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0xe3eb8",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0xe3f90",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Legendz - Sign of Nekuromu (Japan).gba",
+    "filesize": 16777216,
+    "game-code": "BLVJ",
+    "game-version": 0,
+    "md5": "43ba75f70dc113f7f72c2ce2e7b639bb",
+    "sha1": "0cf507f263991315dc6d9b1fa3783030a4ba5189",
+    "sha256": "aff1d97032fa2a927ed71e44bf5b77fd281cb352159d580ff2ede96c778c5556",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1253c4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x125538",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x125268",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x125340",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Legendz - Yomigaeru Shiren no Shima (Japan).gba",
+    "filesize": 8388608,
+    "game-code": "BLJJ",
+    "game-version": 0,
+    "md5": "9c7546d2fd1399614b035ead1d66aa8d",
+    "sha1": "ff1e05a2fa70933dcf58a8be4f82fa289647c28a",
+    "sha256": "553f3849b096a05d93c52b329c6cef182b09e01a0b4d8bd16a72bdf6ee67fc98",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0xe3fd4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0xe4148",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0xe3e78",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0xe3f50",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Emerald (Japan).gba",
+    "filesize": 16777216,
+    "game-code": "BPEJ",
+    "game-version": 0,
+    "md5": "92eecf93f1ab828bdf2a83daddacf3e5",
+    "sha1": "d7cf8f156ba9c455d164e1ea780a6bf1945465c2",
+    "sha256": "33f5610b9186b4add09fef68895deb00f552b997b3d133b5a961e5123506343c",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x290864",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x2909d8",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x290708",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x2907e0",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Ruby (Japan) (Pokemon Box).gba",
+    "filesize": 8388608,
+    "game-code": "AXVJ",
+    "game-version": 0,
+    "md5": "61657d0452f6b4f1da6e3583ddd15021",
+    "sha1": "910e90d3b90b83690ba12207f87091b67565d8ba",
+    "sha256": "da5b5bfe2fe98de6ccfd8e05e3dc5d5d308a40d19df9e43f1e42c50e94efd59e",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1b0b4c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1b0cc0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1b09f0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1b0ac8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Ruby (Japan) (Rev 1).gba",
+    "filesize": 8388608,
+    "game-code": "AXVJ",
+    "game-version": 1,
+    "md5": "20449adab693bf966bf0f4a907102fb9",
+    "sha1": "971e0d670a95e5b32240b2deed20405b8daddf47",
+    "sha256": "a7ea012b67a27da2893bfdfcb5f64915607b26904b4fc635a1055e8e40e692ab",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1b0b4c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1b0cc0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1b09f0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1b0ac8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Ruby (Japan).gba",
+    "filesize": 8388608,
+    "game-code": "AXVJ",
+    "game-version": 0,
+    "md5": "27c9f37193977828f9808f3f76ff8c76",
+    "sha1": "5c5e546720300b99ae45d2aa35c646c8b8ff5c56",
+    "sha256": "e911caa1ffbf8704cd45bbe064ade40e24efa50dfdce82adf4b2899b5f733852",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1b0b4c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1b0cc0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1b09f0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1b0ac8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Sapphire (Japan) (Pokemon Box).gba",
+    "filesize": 8388608,
+    "game-code": "AXPJ",
+    "game-version": 0,
+    "md5": "1c1e71c7877fe5bfdb3d612006159bf5",
+    "sha1": "3df0c0c6142a9c2a6c632419ebc423ca0d5f42f7",
+    "sha256": "812a0edaa5065fe127de4f7be129c0162bef450614dcfcddd9c8228f9d55d629",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1b0adc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1b0c50",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1b0980",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1b0a58",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Sapphire (Japan) (Rev 1).gba",
+    "filesize": 8388608,
+    "game-code": "AXPJ",
+    "game-version": 1,
+    "md5": "abf042be32e2aeab1b926efe6d4b8b8b",
+    "sha1": "01f509671445965236ac4c6b5a354fe2f1e69f13",
+    "sha256": "1d0d335740875c52cec8bf185dba6a38887f5c66f6fbef1ba2919008dab75baf",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1b0adc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1b0c50",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1b0980",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1b0a58",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pocket Monsters - Sapphire (Japan).gba",
+    "filesize": 8388608,
+    "game-code": "AXPJ",
+    "game-version": 0,
+    "md5": "5323f95f70f5d4f21bed6ec000332bda",
+    "sha1": "3233342c2f3087e6ffe6c1791cd5867db07df842",
+    "sha256": "6a5ff7656531ab41d1ea9cd8f2d045ab6228405b43f3ee09ea3ff5077c0f60c9",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1b0adc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1b0c50",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1b0980",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1b0a58",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Aurora Ticket Distribution (USA) (Kiosk).gba",
+    "filesize": 4194304,
+    "game-code": "JPAJ",
+    "game-version": 0,
+    "md5": "89073fce9c0d5b25acdfdf8a1d7b9d9d",
+    "sha1": "94a21d133e3f1b1a2129f450a9bc753d12c13b09",
+    "sha256": "90c3dccecbea1e7fb7e497ff15c5d5ce88392e604d4ef29846764eba46eba912",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0xbf30",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0xc0a4",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0xbdd4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0xbeac",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Edicion Esmeralda (Spain).gba",
+    "filesize": 16777216,
+    "game-code": "BPES",
+    "game-version": 0,
+    "md5": "67b770405f7b87589e0342513b25fe9b",
+    "sha1": "fe1558a3dcb0360ab558969e09b690888b846dd9",
+    "sha256": "e32c82bd10f174cf4019123b36f3ef7729105fb6634d9aa6b61413ee5101a55e",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x2e9a68",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x2e9bdc",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x2e990c",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x2e99e4",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Edicion Rubi (Spain) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXVS",
+    "game-version": 1,
+    "md5": "61623a55ac0ff4cb97db7c9a78a477ad",
+    "sha1": "9ac73481d7f5d150a018309bba91d185ce99fb7c",
+    "sha256": "0db39958c19abcedc7670fb16fd3274a5b205df794eb7491bea0580aa752e095",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e4db4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e4f28",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e4c58",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e4d30",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Edicion Rubi (Spain).gba",
+    "filesize": 16777216,
+    "game-code": "AXVS",
+    "game-version": 0,
+    "md5": "e15eff9df4cdb078896e7ee894dc98f6",
+    "sha1": "1f49f7289253dcbfecbc4c5ba3e67aa0652ec83c",
+    "sha256": "b03c3d0230889a40615371bd616f02160dd1e33bb116659d72d98c27462c40d0",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e4db4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e4f28",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e4c58",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e4d30",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Edicion Zafiro (Spain) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXPS",
+    "game-version": 1,
+    "md5": "a40e90f68309ad1fd0b9efe33dcc6ba8",
+    "sha1": "0fe9ad1e602e2fafa090aee25e43d6980625173c",
+    "sha256": "6b91637f07b902cfe7401eeb237ea44e13354ab5f5b487c9cf24ce3708385f6a",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e4d44",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e4eb8",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e4be8",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e4cc0",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Edicion Zafiro (Spain).gba",
+    "filesize": 16777216,
+    "game-code": "AXPS",
+    "game-version": 0,
+    "md5": "cc87721bb3dfa680f15e875edcf0b4dd",
+    "sha1": "3a6489189e581c4b29914071b79207883b8c16d8",
+    "sha256": "23f26d9858944b86bab00019f3aee3b50ba8c5d100dba650177025078208aea9",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e4d44",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e4eb8",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e4be8",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e4cc0",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Emerald Version (USA, Europe).gba",
+    "filesize": 16777216,
+    "game-code": "BPEE",
+    "game-version": 0,
+    "md5": "605b89b67018abcea91e693a4dd25be3",
+    "sha1": "f3ae088181bf583e55daf962a92bb46f4f1d07b7",
+    "sha256": "a9dec84dfe7f62ab2220bafaef7479da0929d066ece16a6885f6226db19085af",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x2e22dc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x2e2450",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x2e2180",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x2e2258",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Rubin-Edition (Germany) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXVD",
+    "game-version": 1,
+    "md5": "9aa6ac6fd369a686373a2e1bf8bb6aa3",
+    "sha1": "424740be1fc67a5ddb954794443646e6aeee2c1b",
+    "sha256": "e0b620d576bc503e083bb9d2af1f5ffc40127b84e6ca734e3c45534d0d008043",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1ed010",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1ed184",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1eceb4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1ecf8c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Rubin-Edition (Germany).gba",
+    "filesize": 16777216,
+    "game-code": "AXVD",
+    "game-version": 0,
+    "md5": "1af28ea547d4116dc752c93f7f694239",
+    "sha1": "1c2a53332382e14dab8815e3a6dd81ad89534050",
+    "sha256": "22b28a91be484178236d7f39d64210205698b417394913e089b47796c998fa75",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1ed010",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1ed184",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1eceb4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1ecf8c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Ruby Version (USA, Europe) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXVE",
+    "game-version": 1,
+    "md5": "e0503182a2e699678bcf25a6897a24d6",
+    "sha1": "610b96a9c9a7d03d2bafb655e7560ccff1a6d894",
+    "sha256": "0d80909998a901c7edef5942068585bc855a85aec7e083aa6aeff84a5b2f8ec0",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e00bc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e0230",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1dff60",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e0038",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Ruby Version (USA, Europe) (Rev 2).gba",
+    "filesize": 16777216,
+    "game-code": "AXVE",
+    "game-version": 2,
+    "md5": "3e1b2065b3837c14ffbd03fe205fdfd7",
+    "sha1": "5b64eacf892920518db4ec664e62a086dd5f5bc8",
+    "sha256": "0fdd36e92b75bed65d09df4635ab0b707b288c2bf1dc4c6e7a4a4f0eebe9d64c",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e00bc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e0230",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1dff60",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e0038",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Ruby Version (USA, Europe).gba",
+    "filesize": 16777216,
+    "game-code": "AXVE",
+    "game-version": 0,
+    "md5": "53d1a2027ab49df34a689faa1fb14726",
+    "sha1": "f28b6ffc97847e94a6c21a63cacf633ee5c8df1e",
+    "sha256": "53d591215de2cab847d14fbcf8c516f0128cfa8556f1236065e0535aa5936d4e",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e00a4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e0218",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1dff48",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e0020",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Saphir-Edition (Germany) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXPD",
+    "game-version": 1,
+    "md5": "9d816b369343d39b94af9a8b0ce7f63b",
+    "sha1": "7e6e034f9cdca6d2c4a270fdb50a94def5883d17",
+    "sha256": "c27271a60fdeadc6eed957e0392e7d878998ae1765487bf7567fa9331e432ead",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1ecfa4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1ed118",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1ece48",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1ecf20",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Saphir-Edition (Germany).gba",
+    "filesize": 16777216,
+    "game-code": "AXPD",
+    "game-version": 0,
+    "md5": "43906c58afaf0760f62ec698ef10eafc",
+    "sha1": "5a087835009d552d4c5c1f96be3be3206e378153",
+    "sha256": "93273046f4a89990bfb162ce1c3661982e3d9e6b8e677b6b31c44353207ea13d",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1ecfa4",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1ed118",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1ece48",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1ecf20",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Sapphire Version (USA, Europe) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXPE",
+    "game-version": 1,
+    "md5": "3a32fd98b065283d09eeba1ce0542888",
+    "sha1": "4722efb8cd45772ca32555b98fd3b9719f8e60a9",
+    "sha256": "2f680a43e5c57aede4cb3b2cb04f7e15079efc122c88edaacfd6026db6e920ac",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e004c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e01c0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1dfef0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1dffc8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Sapphire Version (USA, Europe) (Rev 2).gba",
+    "filesize": 16777216,
+    "game-code": "AXPE",
+    "game-version": 2,
+    "md5": "9bc2b765ca6997175fac51e6cdc29089",
+    "sha1": "89b45fb172e6b55d51fc0e61989775187f6fe63c",
+    "sha256": "02ca41513580a8b780989dee428df747b52a0b1a55bec617886b4059eb1152fb",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e004c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e01c0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1dfef0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1dffc8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Sapphire Version (USA, Europe).gba",
+    "filesize": 16777216,
+    "game-code": "AXPE",
+    "game-version": 0,
+    "md5": "f34e91399c719812e66e2c828a2e93d7",
+    "sha1": "3ccbbd45f8553c36463f13b938e833f652b793e4",
+    "sha256": "c36c1b899503e8823ee7eb607eea583adcef7ea92ff804838b193c227f2c6657",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e0034",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e01a8",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1dfed8",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1dffb0",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Smaragd-Edition (Germany).gba",
+    "filesize": 16777216,
+    "game-code": "BPED",
+    "game-version": 0,
+    "md5": "f793a854654b467211fc32c4062cb183",
+    "sha1": "61c2eb2b380b1a75f0c94b767a2d4c26cd7ce4e3",
+    "sha256": "7c599c56849efeebeb93bd71f714932ae4cdf980db51c9c1016b4431057f71d4",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x2f801c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x2f8190",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x2f7ec0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x2f7f98",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Version Emeraude (France).gba",
+    "filesize": 16777216,
+    "game-code": "BPEF",
+    "game-version": 0,
+    "md5": "2c00e335288a96650e34785b5e2a7588",
+    "sha1": "ca666651374d89ca439007bed54d839eb7bd14d0",
+    "sha256": "e79b40e6189550b4870b06918a5c59e04d3a2e1d7c92718aeda92181201f51e4",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x2eb2b0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x2eb424",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x2eb154",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x2eb22c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Version Rubis (France) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXVF",
+    "game-version": 1,
+    "md5": "c014449536d7d32e5b6a3b91d10c0fe9",
+    "sha1": "ba888dfba231a231cbd60fe228e894b54fb1ed79",
+    "sha256": "9678645ca67932a42c92b1d6bac118925a6be9f67135ae8fe7747df85cdabdd0",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e849c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e8610",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e8340",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e8418",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Version Rubis (France).gba",
+    "filesize": 16777216,
+    "game-code": "AXVF",
+    "game-version": 0,
+    "md5": "3c971ea747a4bbdbd305c6f85c1c99ff",
+    "sha1": "a6ee94202bec0641c55d242757e84dc89336d4cb",
+    "sha256": "160185eb928c649b0bb5cfbda6d3cb5239b474b69c0a6b61d939bbfd546177f7",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e849c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e8610",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e8340",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e8418",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Version Saphir (France) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXPF",
+    "game-version": 1,
+    "md5": "c59c79d8bfacd27a1c3fafda2bd801d0",
+    "sha1": "860e93f5ea44f4278132f6c1ee5650d07b852fd8",
+    "sha256": "476ef6e6534894d0646265a4db77fff84b10f04fde81f0730dd07b28f086fb04",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e842c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e85a0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e82d0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e83a8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Version Saphir (France).gba",
+    "filesize": 16777216,
+    "game-code": "AXPF",
+    "game-version": 0,
+    "md5": "2e6e9e3b87f99f04a1ac44b01bfa6ecd",
+    "sha1": "c269b5692b2d0e5800ba1ddf117fda95ac648634",
+    "sha256": "687dcb560ad4ecec719c9ee94b5a58bde3185d5afbceaf8560b6b907a493f92e",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e842c",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e85a0",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e82d0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e83a8",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Versione Rubino (Italy) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXVI",
+    "game-version": 1,
+    "md5": "1191848184916ade8df270fa27d2555f",
+    "sha1": "015a5d380afe316a2a6fcc561798ebff9dfb3009",
+    "sha256": "be116b6fa8d8c12d7ccff3faefd5defd886faa427ff2c85c06d245cbe4e531b2",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e1d30",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e1ea4",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e1bd4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e1cac",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Versione Rubino (Italy).gba",
+    "filesize": 16777216,
+    "game-code": "AXVI",
+    "game-version": 0,
+    "md5": "4d3e531abcbbe530c0543c91d1d7d63f",
+    "sha1": "2b3134224392f58da00f802faa1bf4b5cf6270be",
+    "sha256": "61844250fc2766dbab163c84e277c50e3a0b35d6f2defb491a2d38def0ef2ab7",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e1d30",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e1ea4",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e1bd4",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e1cac",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Versione Smeraldo (Italy).gba",
+    "filesize": 16777216,
+    "game-code": "BPEI",
+    "game-version": 0,
+    "md5": "c3e85be7372bbd5e43f6334a565968c1",
+    "sha1": "1692db322400c3141c5de2db38469913ceb1f4d4",
+    "sha256": "63cbff3500b657cb6966568beb0780de3655d3a0b2e5ac6e0ec33d5d01a916ad",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x2e3268",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x2e33dc",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x2e310c",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x2e31e4",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Versione Zaffiro (Italy) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "AXPI",
+    "game-version": 1,
+    "md5": "b075dcf2b63a992e10204b553800ff40",
+    "sha1": "73edf67b9b82ff12795622dca412733755d2c0fe",
+    "sha256": "e2f75b0ce7c55d5cbe6ec23eee5f2806101a02a00a13b3c4fdfe7f7d3e8b6898",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e1cc0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e1e34",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e1b64",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e1c3c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Pokemon - Versione Zaffiro (Italy).gba",
+    "filesize": 16777216,
+    "game-code": "AXPI",
+    "game-version": 0,
+    "md5": "f42847fa81d5d1cf30d1dd5b64924561",
+    "sha1": "f729dd571fb2c09e72c5c1d68fe0a21e72713d34",
+    "sha256": "74795c4301e02121d2687e0d1b89335534dae1a18af72e022725589f28c97fe0",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x1e1cc0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x1e1e34",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x1e1b64",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x1e1c3c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Rockman EXE 4.5 - Real Operation (Japan) (Virtual Console).gba",
+    "filesize": 8388608,
+    "game-code": "BR4J",
+    "game-version": 0,
+    "md5": "97c3b138b9797675dfb2135118347992",
+    "sha1": "6efcd1f8ef84f6f90f265a33ca3d469fb6c41e7f",
+    "sha256": "be703c3821d86305da7b2c016aaae00516db6905aced4e03dc650eea5ae4b0d5",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0xecdf0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0xecf64",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0xecc94",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0xecd6c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Rockman EXE 4.5 - Real Operation (Japan).gba",
+    "filesize": 8388608,
+    "game-code": "BR4J",
+    "game-version": 0,
+    "md5": "0f82bb24585c9ec64e99394c9d316315",
+    "sha1": "f89ef4ca8ec1823eb75fa184f2d0f9e66cc78a59",
+    "sha256": "588a77da006fb0dca0c8addbcc316d7bd4b1c3a42db24750bcfe17b170ac5ef8",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0xecdf0",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0xecf64",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0xecc94",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0xecd6c",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Sennen Kazoku (Japan) (Rev 1) (Virtual Console).gba",
+    "filesize": 16777216,
+    "game-code": "BKAJ",
+    "game-version": 1,
+    "md5": "bf9caf68637c74cea9bea4f16dac393c",
+    "sha1": "19aca1ff68cf38c28e8dd6482c8a4e3097b7a62f",
+    "sha256": "eb178c04d0773554395d8576cff5885af535dab0ae2c12ca5bef3b3131f2ccf3",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x24ed48",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x24eebc",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x24ebec",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x24ecc4",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Sennen Kazoku (Japan) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "BKAJ",
+    "game-version": 1,
+    "md5": "04615a5e1b6aca1d2934c290cbd12cfa",
+    "sha1": "18f9f8a25207aaecd3eba55a358cfaf11abd4897",
+    "sha256": "219f91b477b908cc391aa9cc05acd17c41f5d220588dd6debf40ba5da1af41de",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x24ed48",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x24eebc",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x24ebec",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x24ecc4",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Sennen Kazoku (Japan).gba",
+    "filesize": 16777216,
+    "game-code": "BKAJ",
+    "game-version": 0,
+    "md5": "914bd4b83ad1a0b426cb183132526431",
+    "sha1": "4dcd7cee46d3a5e848a22eb371bebbbc2fb8d488",
+    "sha256": "0000c46dc2c00c45f28557553ad59ea6d4f301e82e7336e7d0363d50dc051ca0",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x24ece8",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x24ee5c",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x24eb8c",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x24ec64",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Shin Bokura no Taiyou - Gyakushuu no Sabata (Japan).gba",
+    "filesize": 16777216,
+    "game-code": "U33J",
+    "game-version": 0,
+    "md5": "fbad88c14dcedefe6c70b06adcd0a0db",
+    "sha1": "2651c5e6875ac60abff734510d152166d211c87c",
+    "sha256": "0b170fc99def2ca5bdebbfd642327e135304adba1e3e0bfd5d66cdd298adb90f",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x248afc",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x248c70",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x2489a0",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x248a78",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Zoku Bokura no Taiyou - Taiyou Shounen Django (Japan) (Rev 1).gba",
+    "filesize": 16777216,
+    "game-code": "U32J",
+    "game-version": 1,
+    "md5": "6449dc62cdf67c4d4d293febd38dcfda",
+    "sha1": "1a81843c3070decea4cbca20c4563541400b2437",
+    "sha256": "65856f9d2eff795ae2aa5c3162e6a5f093dad40bedcb148be5a7d72c8d8ee7e3",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x24c724",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x24c898",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x24c5c8",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x24c6a0",
+          "size": 132
+        }
+      }
+    }
+  },
+  {
+    "filename": "Zoku Bokura no Taiyou - Taiyou Shounen Django (Japan).gba",
+    "filesize": 16777216,
+    "game-code": "U32J",
+    "game-version": 0,
+    "md5": "f4e3dead5af182598623cf89f9a428f4",
+    "sha1": "54a4dcdeca2ee9a22559eb104b88586386639097",
+    "sha256": "dbdd96dc07d23f12f9044e072507d2be1915fd4f40b6f40876bc0ebf34b11fc7",
+    "targets": {
+      "rtc": {
+        "getstatus_fn": {
+          "addr": "0x24c678",
+          "size": 204
+        },
+        "gettimedate_fn": {
+          "addr": "0x24c7ec",
+          "size": 176
+        },
+        "probe_fn": {
+          "addr": "0x24c51c",
+          "size": 214
+        },
+        "reset_fn": {
+          "addr": "0x24c5f4",
+          "size": 132
+        }
+      }
+    }
+  }
+]
