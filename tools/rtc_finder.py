@@ -29,5 +29,5 @@ with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
 patches = filter(lambda x: x, patches)
 patches = sorted(patches, key=lambda x:x["filename"])
 
-print(json.dumps(patches, indent=2))
+print(json.dumps(patches, indent=2, sort_keys=True))
 

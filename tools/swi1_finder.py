@@ -27,5 +27,5 @@ results = filter(lambda x: x["targets"]["waitcnt"]["patch-sites"], results)
 # Sort by filename, for proper diffing :)
 results = sorted(results, key=lambda x:x["filename"])
 
-print(json.dumps(results, indent=2))
+print(json.dumps(results, indent=2, sort_keys=True))
 

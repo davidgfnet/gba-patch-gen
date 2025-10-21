@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
   if args.format == "json":
     with open(args.outfile, "w") as ofd:
-      ofd.write(json.dumps(serp, indent=2))
+      ofd.write(json.dumps(serp, indent=2, sort_keys=True))
 
   elif args.format == "db":
     with open(args.outfile, "wb") as ofd:
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         ofd.write("  b'" + "".join('\\x%02x' % c for c in pg) + "',\n")
       ofd.write(']\n\n')
 
-      ofd.write('PATCHES = %s\n\n' % json.dumps(serp, indent=2))
+      ofd.write('PATCHES = %s\n\n' % json.dumps(serp, indent=2, sort_keys=True))
 
       ofd.write('for p in PATCHES:\n')
       ofd.write('  for f in p["files"]:\n')

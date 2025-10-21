@@ -25,5 +25,5 @@ with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
 
 findings = sorted(findings, key=lambda x:x["filename"])
 
-print(json.dumps(findings, indent=2))
+print(json.dumps(findings, indent=2, sort_keys=True))
 

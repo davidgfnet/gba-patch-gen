@@ -181,6 +181,6 @@ if __name__ == "__main__":
   # Do the actual merging!
   output_patches = merge_patches(plist)
 
-  open(args.outfile, "w").write(json.dumps(output_patches, indent=2))
+  open(args.outfile, "w").write(json.dumps(output_patches, indent=2, sort_keys=True))
 
 
