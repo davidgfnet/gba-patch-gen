@@ -408,7 +408,7 @@ def regexfinder(buf, regex):
 def find_bx(rom, start):
   while True:
     inst = struct.unpack("<H", rom[start:start+2])[0]
-    if (inst & 0xFF07) == 0x4700:
+    if (inst & 0xFF87) == 0x4700:
       return start
     start += 2
 
