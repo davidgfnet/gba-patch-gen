@@ -106,7 +106,7 @@ def emulate_arm_insts(start, end, rom):
 
   return [(t, a - ROM_ADDR) for t, a in ex.execute()]
 
-def process_rom(rom):
+def process_rom(rom, **kwargs):
   targets = []
   for i in range(0, len(rom) & ~3, 4):
     v = struct.unpack("<I", rom[i:i+4])[0]

@@ -6,10 +6,10 @@
 import os, sys, multiprocessing, tqdm, json
 import patchtool.save
 
+savetypes_db = []
 if len(sys.argv) > 2:
-  patchtool.save.savetypes_3p = []
   for fn in sys.argv[2:]:
-    patchtool.save.savetypes_3p.append(json.loads(open(fn).read()))
+    savetypes_db.append(json.loads(open(fn).read()))
 
 flist = []
 for root, dirs, files in os.walk(sys.argv[1], topdown=False):
@@ -19,7 +19,7 @@ for root, dirs, files in os.walk(sys.argv[1], topdown=False):
       flist.append(f)
 
 def wrapper(f):
-  ret = patchtool.save.process_rom(open(f, "rb").read())
+  ret = patchtool.save.process_rom(open(f, "rb").read(), savetypesdb=savetypes_db)
   if ret is None:
     return None
 

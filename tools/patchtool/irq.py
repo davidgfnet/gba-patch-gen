@@ -209,7 +209,7 @@ def check_patch_memclr2(rom, maxcheck=0x200):
       }]
   return []
 
-def process_rom(rom):
+def process_rom(rom, **kwargs):
   targets = []
 
   # Look for good known clear seqs (usually at the start of the ROM)

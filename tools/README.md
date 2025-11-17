@@ -37,6 +37,12 @@ Here there's a collection of tools for patch generation.
    Some thumb instructions have a limited branch range, so they might need
    some free ROM space to properly patch certain functionality.
 
+ * symmap\_analyzer.py: Given a ROM and a sym file (list of symbols with
+   address, type, size and name) it will find patching sites for RTC and
+   save (only flash for now). This is a replacement for save/rtc when symbols
+   are available (ie. derived/patched ROMs). Useful when the compiler is not
+   the same and generates different signatures.
+
 Some tools are provided to manage patch information:
 
  * patch\_merge.py: Merges a set of patches (of different types) and produces a

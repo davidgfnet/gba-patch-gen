@@ -364,7 +364,7 @@ def gen_layout_patch(layout_info, romsize):
 def gen_flash_patch(flash_info):
   ret = []
   # Determnine whether this is a 64KB or a 128KB game.
-  is128 = flash_info["subtype"].startswith("FLASH1M")
+  is128 = (flash_info["target-info"]["flash-size"] == 128*1024)
 
   # Patch the flash-ID functions to return some fixed value
   for ifn in flash_info["target-info"]["ident"]:

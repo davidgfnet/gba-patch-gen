@@ -47,7 +47,7 @@ def find_eeprom(rom):
   return False
 
 
-def process_rom(rom):
+def process_rom(rom, **kwargs):
   skipend = False
   if len(rom) >= 32*1024*1024:
     # Check for EEPROM ROM dumps

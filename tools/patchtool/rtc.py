@@ -121,7 +121,7 @@ def find_bx(rom, start):
 def regexfinder(buf, seq):
   return [{"addr": hex(x), "size": find_bx(buf, x) + 2 - x} for x in match_insts(buf, seq)]
 
-def process_rom(rom):
+def process_rom(rom, **kwargs):
   # Add ROM and index by gamecode/version
   gcode = rom[0x0AC: 0x0B0].decode("ascii")
   grev = rom[0x0BC]

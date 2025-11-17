@@ -26,19 +26,27 @@
           Advanced &#x25be;
         </button>
 
-        <button type="button" class="btn btn-secondary mb-4 advanced-options" id="toggleAdvOff">
-          Advanced &#x25b4;
-        </button>
+        <div id="advancedOptions" class="advanced-options rounded rounded-3 border">
+          <button type="button" class="btn btn-secondary mb-4 advanced-options" id="toggleAdvOff">
+            Advanced &#x25b4;
+          </button>
 
-        <!-- Advanced Options Section (Initially Hidden) -->
-        <div class="advanced-options" id="advancedOptions">
-          <div class="checkbox">
-            <input type="checkbox" id="p-save" name="p-save" checked />
-            Save patches
-          </div>
-          <div class="checkbox">
-            <input type="checkbox" id="p-irq" name="p-irq" checked />
-            IRQ patches (for In-game menu)
+          <!-- Advanced Options Section (Initially Hidden) -->
+          <div>
+            <div class="checkbox">
+              <input type="checkbox" id="p-save" name="p-save" checked />
+              Save patches
+            </div>
+            <div class="checkbox">
+              <input type="checkbox" id="p-irq" name="p-irq" checked />
+              IRQ patches (for In-game menu)
+            </div>
+
+            <div>
+              <label class="filebox-label" for="symfilebox">I have a symbol (.sym) file:</label>
+              <input type="file" id="symfilebox" class="form-control" name="symfilebox" accept="octet/stream,.sym" />
+            </div>
+
           </div>
         </div>
 

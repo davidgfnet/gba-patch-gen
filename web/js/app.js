@@ -17,16 +17,17 @@ var pyodide = null;
 async function main() {
   async function loadpy() {
     pyodide = await loadPyodide();
-    let response = await fetch("../py/patchtool-0.1.0-py3-none-any.whl");
+    let response = await fetch("../py/patchtool-0.2.0-py3-none-any.whl");
     var buf = await response.arrayBuffer();
     await pyodide.unpackArchive(buf, "wheel");
     pyodide.pyimport("patchtool");
   }
   let pyrdy = loadpy()
 
-  const ptypes = ["waitcnt", "irq", "swi1", "save", "layout", "rtc"];
+  const ptypes = ["waitcnt", "irq", "swi1", "save", "layout", "rtc", "symmap"];
   const pnames = {"waitcnt": "WaitCNT", "irq": "IRQ handler", "swi1": "WaitCNT (SWI1)",
-                  "save": "Save game", "layout": "ROM Layout", "rtc": "RTC emulation"};
+                  "save": "Save game", "layout": "ROM Layout", "rtc": "RTC emulation",
+                  "symmap": "Symbol Map"};
   var patchmap = {};
   var nump = 0;
 
@@ -34,9 +35,11 @@ async function main() {
     var ret = "";
     for (var t in patchmap) {
       if (patchmap[t]["result"] == "err")
-        ret += "<div> &#x274C " + pnames[t] + " patches</div>";
-      else
-        ret += "<div> &#x2705; " + pnames[t] + " patches</div>";
+        ret += "<div> &#x274C; " + pnames[t] + " patches</div>";
+      else {
+        var einfo = (patchmap[t]["data"] == null) ? "[No patches]" : "";
+        ret += "<div> &#x2705; " + pnames[t] + " patches " + einfo + "</div>";
+      }
     }
     return ret;
   }
@@ -70,9 +73,12 @@ async function main() {
         "romsize": patchmap.waitcnt.data["filesize"],
         "targets": {},
       };
-      for (var t in patchmap)
-        if (patchmap[t].data != null)
+      // Merge all assets in order by ptypes. This makes symmap win over other targets.
+      for (var t of ptypes)
+        if (t in patchmap && patchmap[t].data != null)
           merged["targets"] = { ...merged["targets"], ...patchmap[t].data.targets };
+
+      console.log(merged);
 
       // Do some pythoning :)
       var pbin = await generate_patches(merged);
@@ -110,35 +116,57 @@ async function main() {
   var b = document.getElementById("mainb");
   b.addEventListener("click", processrom);
 
+  function loadFiles(fileMap, cb, resultMap = {}) {
+    const keys = Object.keys(fileMap);
+    if (!keys.length)
+      return cb(resultMap);
+
+    const key = keys[0];
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      resultMap[key] = new Int8Array(reader.result);
+      const remaining = Object.fromEntries(keys.slice(1).map(k => [k, fileMap[k]]));
+      loadFiles(remaining, cb, resultMap);
+    };
+
+    reader.readAsArrayBuffer(fileMap[key]);
+  }
+
   function processrom() {
     patchmap = {};
 
     // Read local file to a buffer
     var fm = document.getElementById("filebox");
-    var f0 = fm.files[0];
-    var rd = new FileReader();
-    rd.onload = function() {
-      var data = rd.result;
-      var array = new Int8Array(data);
-
-      document.getElementById("status").innerHTML = "Generating patches...";
-      nump = 0;
-      for (let t of ptypes) {
-        if (document.getElementById("p-" + t) && !document.getElementById("p-" + t).checked)
-          continue;
-        workermap[t].postMessage({"type": t, "rom": array});
-        nump++;
-      }
+    var fs = document.getElementById("symfilebox");
+    var imap = {
+      "rom": fm.files[0],
     };
+    if (fs.files && fs.files.length > 0)
+      imap["sym"] = fs.files[0];
 
     try {
-      rd.readAsArrayBuffer(f0);
+      loadFiles(imap, (arrays) => {
+        document.getElementById("status").innerHTML = "Generating patches...";
+        nump = 0;
+        for (let t of ptypes) {
+          if (document.getElementById("p-" + t) && !document.getElementById("p-" + t).checked)
+            continue;
+          workermap[t].postMessage({
+            "type": t,
+            "rom": arrays["rom"],
+            "sym": arrays["sym"],
+          });
+          nump++;
+        }
+      });
 
       document.getElementById("status").innerHTML = "Loading ROM...";
       document.getElementById('inpf').classList.toggle('d-none');
       document.getElementById('outf').classList.toggle('d-none');
     } catch (error) {
       // Show some error
+      console.log(error);
     }
   }
 

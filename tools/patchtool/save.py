@@ -108,7 +108,7 @@ eeprom_v126_writefn = packinsts([
 
 # Functions that run the ID flow (using the 0x90 command), they return a 16 dev:man value
 flash_identfn_v1 = packinsts([
-  0xb590,          # push  {r4, r7, lr}    
+  0xb590,          # push  {r4, r7, lr}
   0xb093,          # sub   sp, #0x4c
   0x466f,          # mov   r7, sp
   0x1d39,          # adds  r1, r7, #4
@@ -293,17 +293,49 @@ aproxm_v2 = re.compile(b'...[\\x08\\x09]...[\\x08\\x09]...[\\x08\\x09]...[\\x08\
 def isp2(n):
   return (n & (n-1) == 0) and n != 0
 
-def is_func_prologue(bseq):
-  inst = struct.unpack("<H", bseq)[0]
-  return (inst & 0xFE00) == 0xB400
+def is_func_prologue(bseq, numargs=0):
+  # Finds a push instruction and allows for some "mov" before that.
+  PROLOGUE_SIZE = 3     # How many insts to check for
+  VALID_MOVS = [0x46]   # Allow movs
+  # Allow for non-arg regs to be written before the push too
+  VALID_MOVS += [0x20 | i for i in range(numargs, 4)]   # Add, mov, sub (+imm)
+  VALID_MOVS += [0x30 | i for i in range(numargs, 4)]
+  VALID_MOVS += [0x80 | i for i in range(numargs, 4)]
+  insts = [struct.unpack("<H", bseq[i*2:i*2+2])[0] for i in range(PROLOGUE_SIZE)]
+
+  for inst in insts:
+    if (inst & 0xFE00) == 0xB400:
+      return True    # Found push inst
+    elif (inst >> 8) not in VALID_MOVS:
+      return False
+
+  return False
+
+def validate_flash_sizes(fsize, ssize, scnt, sshift, devid):
+  # Checks if a flash info entry looks valid.
+  if fsize == 0 or ssize == 0:
+    return False   # Invalid sizes
+  if fsize not in [64*1024, 128*1024]:
+    return False   # Invalid size
+  if not isp2(ssize):
+    return False   # Bad sector size
+  if fsize // ssize != scnt:
+    return False   # Invalid sector count
+  if (1 << (sshift & 0xFF)) != ssize:
+    return False   # Invalid sector shift amount
+
+  # Ensure the device ID looks good!
+  return devid in KNOWN_DEVICE_IDS
 
 # Extracts data from the structure and validates it (returns None for false positives)
-def flash_unpack_v1(boff, fulldata, data):
-  pg_sec, clrfull, clrsec, waitfn, _, fsize, ssize, _, scnt, _, _, _, _, devid = struct.unpack("<IIIIIIIHHHHHHH", data[:42])
-  if (fsize == 0 or ssize == 0 or
-      fsize // ssize != scnt or
-      not isp2(fsize) or not isp2(ssize)
-      or devid not in KNOWN_DEVICE_IDS):
+def flash_unpack(boff, fulldata, data, version, check_funcs):
+  if version == 1:
+    pg_sec, clrfull, clrsec, waitfn, _, fsize, ssize, sshift, scnt, _, _, _, _, devid = struct.unpack("<IIIIIIIHHHHHHH", data[:42])
+    pg_byte = None
+  else:
+    pg_byte, pg_sec, clrfull, clrsec, waitfn, _, fsize, ssize, sshift, scnt, _, _, _, _, devid = struct.unpack("<IIIIIIIIHHHHHHH", data[:46])
+
+  if not validate_flash_sizes(fsize, ssize, scnt, sshift, devid):
     return None
 
   # Functions are thumb usually, remove last bit
@@ -312,13 +344,14 @@ def flash_unpack_v1(boff, fulldata, data):
   clrsec  = clrsec  & 0x1FFFFFE
   waitfn  = waitfn  & 0x1FFFFFE
 
-  if (not is_func_prologue(fulldata[pg_sec:pg_sec+2]) or
-      not is_func_prologue(fulldata[clrfull:clrfull+2]) or
-      not is_func_prologue(fulldata[clrsec:clrsec+2]) or
-      not is_func_prologue(fulldata[waitfn:waitfn+2])):
-    return None
+  if check_funcs:
+    if (not is_func_prologue(fulldata[pg_sec:pg_sec+64], 2) or
+        not is_func_prologue(fulldata[clrfull:clrfull+64]) or
+        not is_func_prologue(fulldata[clrsec:clrsec+64], 1) or
+        not is_func_prologue(fulldata[waitfn:waitfn+64])):
+      return None
 
-  return {
+  ret = {
     "flashinfo": hex(boff),
     "program_sect": hex(pg_sec),
     "erase_chip":   hex(clrfull),
@@ -329,39 +362,27 @@ def flash_unpack_v1(boff, fulldata, data):
     "flash_devsize": KNOWN_DEVICE_IDS[devid],
   }
 
-def flash_unpack_v2(boff, fulldata, data):
-  pg_byte, pg_sec, clrfull, clrsec, waitfn, _, fsize, ssize, _, scnt, _, _, _, _, devid = struct.unpack("<IIIIIIIIHHHHHHH", data[:46])
-  if (fsize == 0 or ssize == 0 or
-      fsize // ssize != scnt or
-      not isp2(fsize) or not isp2(ssize)
-      or devid not in KNOWN_DEVICE_IDS):
-    return None
+  if pg_byte is not None:
+    pg_byte = pg_byte & 0x1FFFFFE
+    if check_funcs:
+      if not is_func_prologue(fulldata[pg_byte:pg_byte+64], 3):
+        return None
+    ret["program_byte"] = hex(pg_byte)
 
-  # Functions are thumb usually, remove last bit
-  pg_byte = pg_byte & 0x1FFFFFE
-  pg_sec  = pg_sec  & 0x1FFFFFE
-  clrfull = clrfull & 0x1FFFFFE
-  clrsec  = clrsec  & 0x1FFFFFE
-  waitfn  = waitfn  & 0x1FFFFFE
+  return ret
 
-  if (not is_func_prologue(fulldata[pg_sec:pg_sec+2]) or
-      not is_func_prologue(fulldata[pg_byte:pg_byte+2]) or
-      not is_func_prologue(fulldata[clrfull:clrfull+2]) or
-      not is_func_prologue(fulldata[clrsec:clrsec+2]) or
-      not is_func_prologue(fulldata[waitfn:waitfn+2])):
-    return None
-
-  return {
-    "flashinfo": hex(boff),
-    "program_byte": hex(pg_byte),
-    "program_sect": hex(pg_sec),
-    "erase_chip":   hex(clrfull),
-    "erase_sect":   hex(clrsec),
-    "wait_write":   hex(waitfn),
-    "flash_size": fsize,
-    "device_id": hex(devid),
-    "flash_devsize": KNOWN_DEVICE_IDS[devid],
-  }
+# Finds flash info tables on ROM.
+# Uses a regexp to find candidates and then validates them using some well-known data.
+def find_flash_tables(rom, check_funcs=True):
+  res0 = [
+    flash_unpack(m.start(), rom, rom[m.start() : m.start() + 128], 1, check_funcs)
+    for m in aproxm_v1.finditer(rom)
+  ]
+  res1 = [
+    flash_unpack(m.start(), rom, rom[m.start() : m.start() + 128], 2, check_funcs)
+    for m in aproxm_v2.finditer(rom)
+  ]
+  return [x for x in (res0 + res1) if x is not None]
 
 SAVE_STRINGS = {
   # EEPROM versions
@@ -431,20 +452,19 @@ def bytefinder(buf, hay):
     ret.append(m)
     offset = m + len(hay)
 
-savetypes_3p = []
 eeprom_savemap = {
   "gba_eeprom_4k": 512,
   "gba_eeprom_64k": 8*1024,
   "gba_eeprom": 8*1024,    # No idea, assume worst case
 }
 
-def lookup_eeprom_size(gcode):
+def lookup_eeprom_size(savetypes_3p, gcode):
   for db in savetypes_3p:
     if gcode in db and db[gcode] in eeprom_savemap:
       return eeprom_savemap[db[gcode]]
   return None
 
-def process_rom(rom):
+def process_rom(rom, **kwargs):
   # Add ROM and index by gamecode/version
   gcode = rom[0x0AC: 0x0B0].decode("ascii")
   grev = rom[0x0BC]
@@ -510,7 +530,7 @@ def process_rom(rom):
             "write": parse_fns_thumb(rom, wr_tgts),
           }
         }
-        guessed_size = lookup_eeprom_size(gcode)
+        guessed_size = lookup_eeprom_size(kwargs.get("savetypesdb", []), gcode)
         if guessed_size:
           targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
     elif gentype == "flash":
@@ -524,11 +544,7 @@ def process_rom(rom):
       ve_tgts = parse_fns_thumb(rom, ve_tgts)
 
       # Find the per-device functions by finding the device impl. table
-      res0 = [flash_unpack_v1(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v1.finditer(rom)]
-      res1 = [flash_unpack_v2(m.start(), rom, rom[m.start() : m.start() + 128]) for m in aproxm_v2.finditer(rom)]
-
-      # Filter out false positives, since the regex is not perfect
-      res = [x for x in (res0 + res1) if x is not None]
+      res = find_flash_tables(rom)
 
       assert "flash" not in targets
       targets["flash"] = {

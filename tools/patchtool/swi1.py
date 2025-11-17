@@ -38,7 +38,7 @@ def ARM_SVC(n):
 def THUMB_SVC(n):
   return 0xdf00 | n
 
-def process_rom(rom):
+def process_rom(rom, **kwargs):
   targets = []
 
   # ARM mode operations: find the SVCs in ARM mode.
