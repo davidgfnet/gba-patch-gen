@@ -439,7 +439,7 @@ def parse_fns_thumb(rom, tgts):
   for t in tgts:
     off = int(t, 16)
     ret.append({"addr": t, "size": find_bx(rom, off) + 2 - off})
-  return sorted(ret, key=lambda x: tuple(x))
+  return sorted(ret, key=lambda x: tuple(x.items()))
 
 # Finds all matches for a buffer and a substring
 def bytefinder(buf, hay):
@@ -485,7 +485,7 @@ def process_rom(rom, **kwargs):
     else:
       # print("No save found for ROM", f, file=sys.stderr)
       pass
-    return
+    return None
 
   elif len(matches) > 1:
     # Certain FLASH types are compatible, so ignore those as long as they are compat
@@ -547,35 +547,38 @@ def process_rom(rom, **kwargs):
       res = find_flash_tables(rom)
 
       assert "flash" not in targets
-      targets["flash"] = {
-        "subtype": stype.decode("ascii"),
-        "target-info": {
-          "avail_devids": sorted(set([x["device_id"] for x in res])),
-          "flash-size": flash_guess_size([x["device_id"] for x in res]),
-          "ident": id_tgts,
-          "read": rd_tgts,
-          "verify": ve_tgts,
-          "writebyte": parse_fns_thumb(rom, set([x["program_byte"] for x in res if "program_byte" in x])),
-          "writesect": parse_fns_thumb(rom, set([x["program_sect"] for x in res])),
-          "erasefull": parse_fns_thumb(rom, set([x["erase_chip"] for x in res])),
-          "erasesect": parse_fns_thumb(rom, set([x["erase_sect"] for x in res])),
+
+      if res and id_tgts and rd_tgts and ve_tgts:
+        targets["flash"] = {
+          "subtype": stype.decode("ascii"),
+          "target-info": {
+            "avail_devids": sorted(set([x["device_id"] for x in res])),
+            "flash-size": flash_guess_size([x["device_id"] for x in res]),
+            "ident": id_tgts,
+            "read": rd_tgts,
+            "verify": ve_tgts,
+            "writebyte": parse_fns_thumb(rom, set([x["program_byte"] for x in res if "program_byte" in x])),
+            "writesect": parse_fns_thumb(rom, set([x["program_sect"] for x in res])),
+            "erasefull": parse_fns_thumb(rom, set([x["erase_chip"] for x in res])),
+            "erasesect": parse_fns_thumb(rom, set([x["erase_sect"] for x in res])),
+          }
         }
-      }
 
   # If a game has only SRAM, mark is as an sram game.
-  if all(x == "sram" for x in targets):
+  if targets and all(x == "sram" for x in targets):
     targets = {"sram": {}}
   else:
     # We can have both EEPROM and FLASH sometimes, so we keep both patch-sets
     targets = {k:v for k,v in targets.items() if k != "sram"}
 
-  return ({
-    "filesize": len(rom),
-    "sha256": hashlib.sha256(rom).hexdigest(),
-    "sha1": hashlib.sha1(rom).hexdigest(),
-    "md5": hashlib.md5(rom).hexdigest(),
-    "game-code": gcode,
-    "game-version": grev,
-    "targets": targets
-  })
+  if targets:
+    return ({
+      "filesize": len(rom),
+      "sha256": hashlib.sha256(rom).hexdigest(),
+      "sha1": hashlib.sha1(rom).hexdigest(),
+      "md5": hashlib.md5(rom).hexdigest(),
+      "game-code": gcode,
+      "game-version": grev,
+      "targets": targets
+    })
 

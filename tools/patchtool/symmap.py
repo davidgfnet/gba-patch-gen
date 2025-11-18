@@ -16,7 +16,6 @@ rtc_names = {
   "SiiRtcGetStatus": "getstatus_fn",
   "SiiRtcGetDateTime": "gettimedate_fn",
 }
-
 flash_names = {
   "ReadFlashId": "ident",
   "ReadFlash": "read",
@@ -29,7 +28,6 @@ flash_prefixes = {
   "EraseFlashChip_": "erasefull",
   "EraseFlashSector_": "erasesect",
 }
-
 flash_req = frozenset(["ident", "read", "verify", "writesect", "erasefull", "erasesect"])
 
 def process_rom(rom, **kwargs):
@@ -85,13 +83,14 @@ def process_rom(rom, **kwargs):
         "target-info": flash_info,
       }
 
-  return ({
-    "filesize": len(rom),
-    "sha256": hashlib.sha256(rom).hexdigest(),
-    "sha1": hashlib.sha1(rom).hexdigest(),
-    "md5": hashlib.md5(rom).hexdigest(),
-    "game-code": gcode,
-    "game-version": grev,
-    "targets": targets
-  })
+  if targets:
+    return ({
+      "filesize": len(rom),
+      "sha256": hashlib.sha256(rom).hexdigest(),
+      "sha1": hashlib.sha1(rom).hexdigest(),
+      "md5": hashlib.md5(rom).hexdigest(),
+      "game-code": gcode,
+      "game-version": grev,
+      "targets": targets
+    })
 

@@ -89,20 +89,21 @@ def process_rom(rom, **kwargs):
 
   # Dedup any entries
   targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["inst-offset"])
-  # Extract ROM info, such as game code
-  gcode = rom[0x0AC: 0x0B0].decode("ascii")
-  grev = rom[0x0BC]
-  return ({
-    "filesize": len(rom),
-    "sha256": hashlib.sha256(rom).hexdigest(),
-    "sha1": hashlib.sha1(rom).hexdigest(),
-    "md5": hashlib.md5(rom).hexdigest(),
-    "game-code": gcode,
-    "game-version": grev,
-    "targets": {
-      "waitcnt": {
-        "patch-sites": targets,
+
+  if targets:
+    gcode = rom[0x0AC: 0x0B0].decode("ascii")
+    grev = rom[0x0BC]
+    return ({
+      "filesize": len(rom),
+      "sha256": hashlib.sha256(rom).hexdigest(),
+      "sha1": hashlib.sha1(rom).hexdigest(),
+      "md5": hashlib.md5(rom).hexdigest(),
+      "game-code": gcode,
+      "game-version": grev,
+      "targets": {
+        "waitcnt": {
+          "patch-sites": targets,
+        }
       }
-    }
-  })
+    })
 
