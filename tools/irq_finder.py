@@ -14,14 +14,19 @@ for root, dirs, files in os.walk(sys.argv[1], topdown=False):
       flist.append(f)
 
 def wrapper(f):
+  ret = patchtool.irq.process_rom(open(f, "rb").read())
+  if ret is None:
+    return None
+
   finfo = {
     "filename": os.path.basename(f),
   }
-  return finfo | patchtool.irq.process_rom(open(f, "rb").read())
+  return finfo | ret
 
 with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
   results = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
+results = filter(lambda x: x, results)
 results = sorted(results, key=lambda x:x["filename"])
 
 print(json.dumps(results, indent=2, sort_keys=True))

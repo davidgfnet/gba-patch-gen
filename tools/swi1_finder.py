@@ -14,16 +14,19 @@ for root, dirs, files in os.walk(sys.argv[1], topdown=False):
       flist.append(f)
 
 def wrapper(f):
+  ret = patchtool.swi1.process_rom(open(f, "rb").read())
+  if ret is None:
+    return None
+
   finfo = {
     "filename": os.path.basename(f),
   }
-  return finfo | patchtool.swi1.process_rom(open(f, "rb").read())
+  return finfo | ret
 
 with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
   results = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
-# Filter out games without any matches.
-results = filter(lambda x: x["targets"]["waitcnt"]["patch-sites"], results)
+results = filter(lambda x: x, results)
 # Sort by filename, for proper diffing :)
 results = sorted(results, key=lambda x:x["filename"])
 
