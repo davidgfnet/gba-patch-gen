@@ -59,7 +59,7 @@ async function main() {
 
       // Merge the patches trivially since there's only one ROM!
       // SWI1 and WAITCNT patches need some custom merging though.
-      if ("swi1" in patchmap && "waitcnt" in patchmap) {
+      if ("swi1" in patchmap && "waitcnt" in patchmap && patchmap.swi1.data != null) {
         patchmap.waitcnt.data.targets.waitcnt["patch-sites"] = patchmap.waitcnt.data.targets.waitcnt["patch-sites"].concat(
                                                                  patchmap.swi1.data.targets.waitcnt["patch-sites"]);
         delete patchmap["swi1"];
