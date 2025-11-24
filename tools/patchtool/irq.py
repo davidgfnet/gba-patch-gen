@@ -131,6 +131,10 @@ def validate_arm_ldr(rom, ldr_addr, regn, str_off, max_gap_size=8):
 
   return None
 
+def store_hook_callback(user_data, write_size, instr, address, value):
+  if write_size == 32 and address == TGT_ADDRESS:
+    user_data["stores"].append(instr.pc())
+
 # Emulates an ARM code chunk and tries to find STR instructions
 # that write the TGT_ADDRESS address.
 def emulate_arm_insts(start, end, rom):
@@ -143,13 +147,15 @@ def emulate_arm_insts(start, end, rom):
   cpust = arm.CPUState(EMU_STCK - 128)
 
   subrom = rom[start:end]
-  ex = arm.InstExecutor(cpust, None, None, TGT_ADDRESS)  # Only care about 32 bit writes
+  usr_data = {"stores": []}
+  def stcb(*args): store_hook_callback(usr_data, *args)
+  ex = arm.InstExecutor(cpust, store_cb=stcb)
   for i in range(0, end - start, 4):
     op = struct.unpack("<I", subrom[i:i+4])[0]
     ex.addinst(arm.ARMInst(ex, ROM_ADDR + start + i, op, readrom))
+  ex.execute()
 
-  return [(t, a - ROM_ADDR) for t, a in ex.execute()]
-
+  return [("str32", a - ROM_ADDR) for a in usr_data["stores"]]
 
 # Some memclear sequences that we need to patch to avoid NULL clearing.
 def check_patch_memclr1(rom, maxcheck=0x200):

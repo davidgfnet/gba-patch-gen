@@ -67,6 +67,22 @@ def clear_bad_seqs(romarr):
         break
   return romarr
 
+def store_hook_callback(user_data, write_size, instr, address, value):
+  if write_size == 8:
+    address &= ~1
+  if address == TGT_ADDR:
+    if write_size == 8:
+      if instr.inst_type() == "thumb":
+        if instr.imm_value() is None:
+          if instr.rb() == instr.ro():
+            # Instructions like STRB rX, [rA + rA] are likely bad instructions
+            return
+        else:
+          if instr.imm_value() >= 2:
+            # Instructions like STRB rX, [rA + imm] use immediates of 0 or 1, usually.
+            return
+    user_data["stores"][write_size].append(instr.pc())
+
 # Emulates a thumb code chunk and tries to find STR instructions
 # that write the WAITCNT register
 def emulate_thumb_insts(start, end, rom):
@@ -79,13 +95,15 @@ def emulate_thumb_insts(start, end, rom):
   cpust = arm.CPUState(EMU_STCK - 128)
 
   subrom = clear_bad_seqs(rom[start:end])
-  ex = arm.InstExecutor(cpust, TGT_ADDR, TGT_ADDR, TGT_ADDR)
+  usr_data = {"stores": {8: [], 16: [], 32: []}}
+  def stcb(*args): store_hook_callback(usr_data, *args)
+  ex = arm.InstExecutor(cpust, store_cb=stcb)
   for i in range(0, end - start, 2):
     op = struct.unpack("<H", subrom[i:i+2])[0]
     ex.addinst(arm.ThumbInst(ex, ROM_ADDR + start + i, op, readrom))
+  ex.execute()
 
-  return [(t, a - ROM_ADDR) for t, a in ex.execute()]
-
+  return [("str%d" % ws, a - ROM_ADDR) for ws, ent in usr_data["stores"].items() for a in ent]
 
 # Emulates an ARM code chunk and tries to find STR/H instructions
 # that write the WAITCNT register.
@@ -99,12 +117,15 @@ def emulate_arm_insts(start, end, rom):
   cpust = arm.CPUState(EMU_STCK - 128)
 
   subrom = clear_bad_seqs(rom[start:end])
-  ex = arm.InstExecutor(cpust, TGT_ADDR, TGT_ADDR, TGT_ADDR)
+  usr_data = {"stores": {8: [], 16: [], 32: []}}
+  def stcb(*args): store_hook_callback(usr_data, *args)
+  ex = arm.InstExecutor(cpust, store_cb=stcb)
   for i in range(0, end - start, 4):
     op = struct.unpack("<I", subrom[i:i+4])[0]
     ex.addinst(arm.ARMInst(ex, ROM_ADDR + start + i, op, readrom))
+  ex.execute()
 
-  return [(t, a - ROM_ADDR) for t, a in ex.execute()]
+  return [("str%d" % ws, a - ROM_ADDR) for ws, ent in usr_data["stores"].items() for a in ent]
 
 def process_rom(rom, **kwargs):
   targets = []

@@ -46,15 +46,15 @@ REG_PC = 15
 #
 # When a resetting inst is met (usually BX) the path finishes there and
 # schedules an initial restart from the next PC.
+#
+# store_cb(write_size, instr, address, value)
 class InstExecutor(object):
-  def __init__(self, initial_state, tgt_addr8=None, tgt_addr16=None, tgt_addr32=None):
+  def __init__(self, initial_state, store_cb=None):
     self._init_state = initial_state
     self._insts = []
     self._exec_queue = []
     self._entry_queue = [0]
-    self._tgt_addr32 = tgt_addr32
-    self._tgt_addr16 = tgt_addr16
-    self._tgt_addr8  = tgt_addr8
+    self._user_store_cb = store_cb
 
   def addinst(self, inst):
     self._insts.append(inst)
@@ -65,7 +65,6 @@ class InstExecutor(object):
     assert len(self._insts) > 0
 
     # Execute blocks as long as they exist.
-    ret = []
     while self._exec_queue or self._entry_queue:
       # Cover all paths until no more paths exist
       while self._exec_queue:
@@ -74,8 +73,6 @@ class InstExecutor(object):
         # Execute all the instructions starting at the specified offset
         for i in range(off, len(self._insts)):
           r = self._insts[i].execute(state)
-          if self._insts[i].target_patch:
-            ret.append((self._insts[i].target_patch, self._insts[i]._pc))
           if r == True:
             break    # Stop running, this is a terminal instruction.
 
@@ -87,8 +84,6 @@ class InstExecutor(object):
           heapq.heappop(self._entry_queue)
 
         self._exec_queue.append((off, copy.deepcopy(self._init_state)))
-
-    return ret
 
   def queue_execution(self, start_pc, state):
     # It might be that the PC is out of range
@@ -181,6 +176,7 @@ class ThumbInst(object):
     self._loadromcb = romcb        # ROM reading callback
     self.target_patch = False
     self._dreg = None
+    self._imm = None
 
     if (opcode >> 11) == 0:       # LSL
       self._emu = self._emu_shift_imm
@@ -417,6 +413,15 @@ class ThumbInst(object):
   def write_reg(self):
     return self._dreg
 
+  def imm_value(self):
+    return self._imm
+
+  def inst_type(self):
+    return "thumb"
+
+  def pc(self):
+    return self._pc
+
   # Decoder
   def rd(self):  return self._opcode & 7
 
@@ -481,19 +486,18 @@ class ThumbInst(object):
     return val
 
   def _store_word(self, st, addr, value):
-    if addr == self._executor._tgt_addr32:   # Writing 206 as well seems common in some games
-      self.target_patch = "str32"
+    if self._executor._user_store_cb:
+      self._executor._user_store_cb(32, self, addr, value)
     return st.store_word(addr, value)
 
   def _store_halfword(self, st, addr, value):
-    if addr == self._executor._tgt_addr16:
-      self.target_patch = "str16"
+    if self._executor._user_store_cb:
+      self._executor._user_store_cb(16, self, addr, value)
     return st.store_halfword(addr, value)
 
   def _store_byte(self, st, addr, value):
-    if (addr & ~1) == self._executor._tgt_addr8:
-      if not self._susp_memop:
-        self.target_patch = "str8"
+    if self._executor._user_store_cb:
+      self._executor._user_store_cb(8, self, addr, value)
     return st.store_byte(addr, value)
 
   def _badinst(self, st):
@@ -563,8 +567,6 @@ class ThumbInst(object):
     rb = st.regs[self.rb()]
     ro = st.regs[self.ro()]
     rd = st.regs[self.rd()]
-    # Operations using the same reg (ie. rX+rX) are likely to be garbage data.
-    self._susp_memop = self.rb() == self.ro()
     if rb is not None and ro is not None:
       self._store_cb(st, rb + ro, rd)
 
@@ -612,8 +614,6 @@ class ThumbInst(object):
   def _emu_stimm(self, st):
     rb = st.regs[self.rb()]
     rd = st.regs[self.rd()]
-    # Byte writes usually use 0/1 offsets.
-    self._susp_memop = self._imm >= 2
     if rb is not None:
       self._store_cb(st, rb + self._imm, rd)
 
@@ -1071,6 +1071,12 @@ class ARMInst(object):
   def write_reg(self):
     return self._dreg
 
+  def inst_type(self):
+    return "arm"
+
+  def pc(self):
+    return self._pc
+
   def execute(self, cpustate):
     cpustate.regs[REG_PC] = self._pc  # Set PC value since ARM can easily read it
     return self._emu(cpustate)
@@ -1084,18 +1090,18 @@ class ARMInst(object):
 
   # Memops
   def _store_word(self, st, addr, value):
-    if addr == self._executor._tgt_addr32:
-      self.target_patch = "str32"
+    if self._executor._user_store_cb:
+      self._executor._user_store_cb(32, self, addr, value)
     return st.store_word(addr, value)
 
   def _store_halfword(self, st, addr, value):
-    if addr == self._executor._tgt_addr16:
-      self.target_patch = "str16"
+    if self._executor._user_store_cb:
+      self._executor._user_store_cb(16, self, addr, value)
     return st.store_halfword(addr, value)
 
   def _store_byte(self, st, addr, value):
-    if (addr & ~1) == self._executor._tgt_addr8:
-      self.target_patch = "str8"
+    if self._executor._user_store_cb:
+      self._executor._user_store_cb(8, self, addr, value)
     return st.store_byte(addr, value)
 
   def _load_word(self, st, addr):
