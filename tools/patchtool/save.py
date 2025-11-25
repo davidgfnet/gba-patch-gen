@@ -16,6 +16,12 @@
 # Use pypy to run this, it's 20x faster than regular python :)
 
 import sys, struct, re, hashlib
+import patchtool.arm as arm
+from functools import reduce
+
+EMU_OFFSET_THB = 4096             # Capture thumb load + offset for function start
+ROM_ADDR = 0x08000000
+EMU_STCK = 0x02008000             # Use some "reasonable" and plausible SP
 
 # Using the longest common function start/prologue to avoid false positives
 
@@ -106,25 +112,6 @@ eeprom_v126_writefn = packinsts([
 ])
 
 
-# Functions that run the ID flow (using the 0x90 command), they return a 16 dev:man value
-flash_identfn_v1 = packinsts([
-  0xb590,          # push  {r4, r7, lr}
-  0xb093,          # sub   sp, #0x4c
-  0x466f,          # mov   r7, sp
-  0x1d39,          # adds  r1, r7, #4
-  0x1c08,          # adds  r0, r1, #0
-  0xf000, None,    # bl    off
-  0x1d38,          # adds  r0, r7, #4
-])
-flash_identfn_v2 = packinsts([
-  0xb530,          # push  {r4, r5, lr}
-  0xb091,          # sub   sp, #0x44
-  0x4668,          # mov   r0, sp
-  0xf000, None,    # bl    off
-  0x466d,          # mov   r5, sp
-  0x3501,          # adds  r5, #1
-  0x4a06,          # ldr   r2, [pc, #24]
-])
 # Read handlers, they read at a given offset/page into a buffer
 flash_v1_read = packinsts([
   0xb590,          # push  {r4, r7, lr}
@@ -394,17 +381,17 @@ SAVE_STRINGS = {
   b"EEPROM_V125": ("eeprom", None, eeprom_v12x_readfn, eeprom_v12_45_writefn),  # A couple games use this
   b"EEPROM_V126": ("eeprom", None, eeprom_v12x_readfn, eeprom_v126_writefn),    # A handful of games use this
   # Flash versions
-  b"FLASH_V120":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),                     # ~2 games
-  b"FLASH_V121":    ("flash", "v1", flash_identfn_v1, flash_v1_read, flash_v1_verify),                     # ~15 games
-  b"FLASH_V123":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~15 games
-  b"FLASH_V124":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~20 games
-  b"FLASH_V125":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~2 games
-  b"FLASH_V126":    ("flash", "v2", flash_identfn_v2, flash_v2_read, flash_v2_verify),                     # ~60 games
-  b"FLASH512_V130": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~15 games
-  b"FLASH512_V131": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~70 games
-  b"FLASH512_V133": ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~10 games (2in1 mostly)
-  b"FLASH1M_V102":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~20 games
-  b"FLASH1M_V103":  ("flash", "v3", flash_identfn_v2, flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~50 ROMs (Pokemon)
+  b"FLASH_V120":    ("flash", "v1", flash_v1_read, flash_v1_verify),                     # ~2 games
+  b"FLASH_V121":    ("flash", "v1", flash_v1_read, flash_v1_verify),                     # ~15 games
+  b"FLASH_V123":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~15 games
+  b"FLASH_V124":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~20 games
+  b"FLASH_V125":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~2 games
+  b"FLASH_V126":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~60 games
+  b"FLASH512_V130": ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~15 games
+  b"FLASH512_V131": ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~70 games
+  b"FLASH512_V133": ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~10 games (2in1 mostly)
+  b"FLASH1M_V102":  ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~20 games
+  b"FLASH1M_V103":  ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~50 ROMs (Pokemon)
 
   # SRAM
   b"SRAM_V110":   ("sram", None, None),
@@ -457,6 +444,73 @@ eeprom_savemap = {
   "gba_eeprom_64k": 8*1024,
   "gba_eeprom": 8*1024,    # No idea, assume worst case
 }
+
+def find_flash_ident(rom):
+  # Find thumb branch instructions and record addresses.
+  thfuncs = set()
+  for i in range(0, len(rom)-2, 2):
+    lo, hi = struct.unpack("<HH", rom[i:i+4])
+    if (lo & 0xF800) == 0xF000 and (hi & 0xF800) == 0xF800:
+      hioff = (lo & 0x7FF) << 12
+      if hioff & 0x400000:
+        hioff -= (1 << 23)
+
+      off = i + 4 + hioff + (hi & 0x7FF) * 2
+      # Ensure the function starts with a push
+      if off > 0 and off < len(rom):
+        opc = struct.unpack("<H", rom[off:off+2])[0]
+        if (opc >> 8) == 0xB5:
+          thfuncs.add(off)
+
+  # Find critical constants zones
+  ranges = []
+  for i in range(0, len(rom), 4):
+    data = struct.unpack("<I", rom[i:i+4])[0]
+    if data in [0x0E005555, 0x0E002AAA]:
+      ranges.append((max(0, i - EMU_OFFSET_THB), i + EMU_OFFSET_THB))
+
+  def readrom(addr):
+    romaddr = (addr & 0x1FFFFFF)
+    if romaddr + 4 <= len(rom):
+      return struct.unpack("<I", rom[romaddr: romaddr+4])[0]
+    return None
+
+  def store_hook_callback(user_data, write_size, instr, address, value):
+    if value:
+      if write_size == 8 and (address >> 24) == 0x0E:
+        if user_data["seq"] == 0 and address == 0x0E005555 and value == 0xAA:
+          user_data["seq"] += 1
+        elif user_data["seq"] == 1 and address == 0x0E002AAA and value == 0x55:
+          user_data["seq"] += 1
+        elif user_data["seq"] == 2 and address == 0x0E005555 and value == 0x90:
+          user_data["found"] = True
+        else:
+          user_data["seq"] = 0
+
+  ranges = sorted(ranges)
+  ranges = reduce(lambda acc, r: acc + [r] if not acc or acc[-1][1] < r[0] else acc[:-1] + [(acc[-1][0], max(acc[-1][1], r[1]))], ranges, [])
+  # Find function start in each range
+  ret = []
+  for s, e in ranges:
+    for i in range(e, s, -2):
+      if i in thfuncs:
+        # Execute the current block, see if that brings a flash-ident sequence
+        cpust = arm.CPUState(EMU_STCK - 128)
+
+        usr_data = {"seq": 0, "found": False}
+        def stcb(*args): store_hook_callback(usr_data, *args)
+        ex = arm.InstExecutor(cpust, store_cb=stcb)
+        for j in range(i, e, 2):
+          op = struct.unpack("<H", rom[j:j+2])[0]
+          ex.addinst(arm.ThumbInst(ex, ROM_ADDR + j, op, readrom))
+        ex.execute()
+        if usr_data["found"]:
+          ret.append({
+            "addr": hex(i),
+            "size": find_bx(rom, i) + 2 - i,
+          })
+          break
+  return sorted(ret, key=lambda x: tuple(x.items()))
 
 def lookup_eeprom_size(savetypes_3p, gcode):
   for db in savetypes_3p:
@@ -535,9 +589,9 @@ def process_rom(rom, **kwargs):
           targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
     elif gentype == "flash":
       # Ident flash and read functions are found using the regular method!
-      identfn, readfn, *verifns = fnhooks
-      id_tgts = parse_fns_thumb(rom, regexfinder(rom, identfn))
+      readfn, *verifns = fnhooks
       rd_tgts = parse_fns_thumb(rom, regexfinder(rom, readfn))
+      id_tgts = find_flash_ident(rom)
       ve_tgts = []
       for m in verifns:
         ve_tgts += regexfinder(rom, m)
