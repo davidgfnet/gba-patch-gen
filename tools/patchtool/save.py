@@ -518,6 +518,16 @@ def lookup_eeprom_size(savetypes_3p, gcode):
       return eeprom_savemap[db[gcode]]
   return None
 
+def lookup_mem_type(savetypes_3p, gcode):
+  for db in savetypes_3p:
+    if gcode in db:
+      if 'flash' in db[gcode]:
+        return 'flash'
+      elif 'eeprom' in db[gcode]:
+        return 'eeprom'
+  return None
+
+
 def process_rom(rom, **kwargs):
   # Add ROM and index by gamecode/version
   gcode = rom[0x0AC: 0x0B0].decode("ascii")
@@ -624,6 +634,14 @@ def process_rom(rom, **kwargs):
   else:
     # We can have both EEPROM and FLASH sometimes, so we keep both patch-sets
     targets = {k:v for k,v in targets.items() if k != "sram"}
+
+  # Try to deambiguate flash vs eeprom if using both libs (happens in some games for some reason)
+  if 'eeprom' in targets and 'flash' in targets:
+    guesst = lookup_mem_type(kwargs.get("savetypesdb", []), gcode)
+    if guesst == 'flash':
+      del targets['eeprom']
+    elif guesst == 'eeprom':
+      del targets['flash']
 
   if targets:
     return ({
