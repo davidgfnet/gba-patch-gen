@@ -68,20 +68,21 @@ def clear_bad_seqs(romarr):
   return romarr
 
 def store_hook_callback(user_data, write_size, instr, address, value):
-  if write_size == 8:
-    address &= ~1
-  if address == TGT_ADDR:
+  if address:
     if write_size == 8:
-      if instr.inst_type() == "thumb":
-        if instr.imm_value() is None:
-          if instr.rb() == instr.ro():
-            # Instructions like STRB rX, [rA + rA] are likely bad instructions
-            return
-        else:
-          if instr.imm_value() >= 2:
-            # Instructions like STRB rX, [rA + imm] use immediates of 0 or 1, usually.
-            return
-    user_data["stores"][write_size].append(instr.pc())
+      address &= ~1
+    if address == TGT_ADDR:
+      if write_size == 8:
+        if instr.inst_type() == "thumb":
+          if instr.imm_value() is None:
+            if instr.rb() == instr.ro():
+              # Instructions like STRB rX, [rA + rA] are likely bad instructions
+              return
+          else:
+            if instr.imm_value() >= 2:
+              # Instructions like STRB rX, [rA + imm] use immediates of 0 or 1, usually.
+              return
+      user_data["stores"][write_size].append(instr.pc())
 
 # Emulates a thumb code chunk and tries to find STR instructions
 # that write the WAITCNT register
