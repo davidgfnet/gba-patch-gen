@@ -49,12 +49,13 @@ REG_PC = 15
 #
 # store_cb(write_size, instr, address, value)
 class InstExecutor(object):
-  def __init__(self, initial_state, store_cb=None):
+  def __init__(self, initial_state, store_cb=None, load_cb=None):
     self._init_state = initial_state
     self._insts = []
     self._exec_queue = []
     self._entry_queue = [0]
     self._user_store_cb = store_cb
+    self._user_load_cb = load_cb
 
   def addinst(self, inst):
     self._insts.append(inst)
@@ -62,7 +63,8 @@ class InstExecutor(object):
     self._end_pc   = self._insts[-1]._pc
 
   def execute(self):
-    assert len(self._insts) > 0
+    if not self._insts:
+      return
 
     # Execute blocks as long as they exist.
     while self._exec_queue or self._entry_queue:
@@ -141,12 +143,13 @@ class CPUState(object):
     return ret
 
   def _store_data(self, addr, value, sz):
-    if value is None:
-      for i, a in enumerate(range(addr, addr+sz)):
-        self.memmap[a] = None
-    else:
-      for i, a in enumerate(range(addr, addr+sz)):
-        self.memmap[a] = (value >> (i*8)) & 0xFF
+    if addr is not None:
+      if value is None:
+        for i, a in enumerate(range(addr, addr+sz)):
+          self.memmap[a] = None
+      else:
+        for i, a in enumerate(range(addr, addr+sz)):
+          self.memmap[a] = (value >> (i*8)) & 0xFF
 
   def load_word(self, addr):
     return self._load_data(addr, 4)
@@ -461,13 +464,19 @@ class ThumbInst(object):
 
   # Callbacks
   def _load_word(self, st, addr):
-    return st.load_word(addr)
+    ret = None if addr is None else st.load_word(addr)
+    if self._executor._user_load_cb:
+      self._executor._user_load_cb(32, self, addr, ret)
+    return ret
 
   def _load_halfword(self, st, addr):
-    return st.load_halfword(addr)
+    ret = None if addr is None else st.load_halfword(addr)
+    if self._executor._user_load_cb:
+      self._executor._user_load_cb(16, self, addr, ret)
+    return ret
 
   def _load_shalfword(self, st, addr):
-    val = st.load_halfword(addr)
+    val = None if addr is None else st.load_halfword(addr)
     if val is None:
       return None
     if val & 0x8000:
@@ -475,10 +484,13 @@ class ThumbInst(object):
     return val
 
   def _load_byte(self, st, addr):
-    return st.load_byte(addr)
+    ret = None if addr is None else st.load_byte(addr)
+    if self._executor._user_load_cb:
+      self._executor._user_load_cb(8, self, addr, ret)
+    return ret
 
   def _load_sbyte(self, st, addr):
-    val = st.load_byte(addr)
+    val = None if addr is None else st.load_byte(addr)
     if val is None:
       return None
     if val & 0x80:
@@ -546,29 +558,25 @@ class ThumbInst(object):
   def _emu_loadpcrel(self, st):
     # Uses the ROM read callback to load the known contant/data
     addr = (self._pc & ~3) + self.imm8() * 4 + 4
-    st.regs[self.rd8()] = self._loadromcb(addr)
+    ret = self._loadromcb(addr)
+    if self._executor._user_load_cb:
+      self._executor._user_load_cb(32, self, addr, ret)
+    st.regs[self.rd8()] = ret
 
   def _emu_ld2r(self, st):
     rb = st.regs[self.rb()]
     ro = st.regs[self.ro()]
     if rb is None or ro is None:
-      st.regs[self.rd()] = None
+      st.regs[self.rd()] = self._load_cb(st, None)
     else:
       st.regs[self.rd()] = self._load_cb(st, rb + ro)
 
   def _emu_ldimm(self, st):
     rb = st.regs[self.rb()]
     if rb is None:
-      st.regs[self.rd()] = None
+      st.regs[self.rd()] = self._load_cb(st, None)
     else:
       st.regs[self.rd()] = self._load_cb(st, rb + self._imm)
-
-  def _emu_st2r(self, st):
-    rb = st.regs[self.rb()]
-    ro = st.regs[self.ro()]
-    rd = st.regs[self.rd()]
-    if rb is not None and ro is not None:
-      self._store_cb(st, rb + ro, rd)
 
   def _push_regs(self, st):
     if st.regs[REG_SP] is not None:
@@ -614,8 +622,19 @@ class ThumbInst(object):
   def _emu_stimm(self, st):
     rb = st.regs[self.rb()]
     rd = st.regs[self.rd()]
-    if rb is not None:
+    if rb is None:
+      self._store_cb(st, None, rd)
+    else:
       self._store_cb(st, rb + self._imm, rd)
+
+  def _emu_st2r(self, st):
+    rb = st.regs[self.rb()]
+    ro = st.regs[self.ro()]
+    rd = st.regs[self.rd()]
+    if rb is not None and ro is not None:
+      self._store_cb(st, rb + ro, rd)
+    else:
+      self._store_cb(st, None, rd)
 
   def _emu_shift_imm(self, st):
     rs = st.regs[self.rs()]

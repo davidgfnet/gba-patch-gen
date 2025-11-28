@@ -22,12 +22,21 @@ from functools import reduce
 EMU_OFFSET_THB = 4096             # Capture thumb load + offset for function start
 ROM_ADDR = 0x08000000
 EMU_STCK = 0x02008000             # Use some "reasonable" and plausible SP
+DATA_RANGE = 128
+PROLOGUE_SIZE = 3
 
 # Using the longest common function start/prologue to avoid false positives
 
 # Packs an instruction sequence into a regex
 def packinsts(seq):
   return re.compile(b"".join(b".." if x is None else b"\\x%02x\\x%02x" % (x & 0xFF, x >> 8) for x in seq))
+
+def constant_in_range(rom, offset, drange, constant):
+  for i in range(offset - drange, offset + drange, 4):
+    data = struct.unpack("<I", rom[i:i+4])[0]
+    if data == constant:
+      return True
+  return False
 
 eeprom_v111_readfn = packinsts([
   0xb5b0,   # push    {r4, r5, r7, lr}
@@ -112,126 +121,6 @@ eeprom_v126_writefn = packinsts([
 ])
 
 
-# Read handlers, they read at a given offset/page into a buffer
-flash_v1_read = packinsts([
-  0xb590,          # push  {r4, r7, lr}
-  0xb0a9,          # sub   sp, #0xa4
-  0x466f,          # mov   r7, sp
-  0x6079,          # str   r1, [r7, #4]
-  0x60ba,          # str   r2, [r7, #8]
-  0x60fb,          # str   r3, [r7, #12]
-  0x1c39,          # adds  r1, r7, #0
-  0x8008,          # strh  r0, [r1, #0]
-])
-flash_v2_read = packinsts([
-  0xb5f0,          # push  {r4, r5, r6, r7, lr}
-  0xb0a0,          # sub   sp, #0x80
-  0x1c0d,          # adds  r5, r1, #0
-  0x1c16,          # adds  r6, r2, #0
-  0x1c1f,          # adds  r7, r3, #0
-  0x0400,          # lsls  r0, r0, #16
-  0x0c04,          # lsrs  r4, r0, #16
-  0x4a08,          # ldr   r2, [pc, #32]
-  0x8810,          # ldrh  r0, [r2, #0]
-  0x4908,          # ldr   r1, [pc, #32]
-  0x4008,          # ands  r0, r1
-  0x2103,          # movs  r1, #3
-  0x4308,          # orrs  r0, r1
-])
-flash_v3_read = packinsts([
-  0xb5f0,          # push {r4, r5, r6, r7, lr}
-  0xb0a0,          # sub  sp, #0x80
-  0x1c0d,          # adds r5, r1, #0
-  0x1c16,          # adds r6, r2, #0
-  0x1c1f,          # adds r7, r3, #0
-  0x0403,          # lsls r3, r0, #0x10
-  0x0c1c,          # lsrs r4, r3, #0x10
-  0x4a0f,          # ldr  r2, [pc, #0x3c]
-  0x8810,          # ldrh r0, [r2]
-  0x490f,          # ldr  r1, [pc, #0x3c]
-  0x4008,          # ands r0, r1
-])
-
-flash_v3_verify = packinsts([
-  0xb530,          # push {r4, r5, lr}
-  0xb0c0,          # sub sp, #256
-  0x1c0d,          # adds r5, r1, #0
-  0x0403,          # lsls r3, r0, #16
-  0x0c1c,          # lsrs r4, r3, #16
-  None,            # ldr  r2, [pc, #X]
-  0x8810,          # ldrh r0, [r2, #0]
-  None,            # ldr  r1, [pc, #X]
-  0x4008,          # ands r0, r1
-  0x2103,          # movs r1, #3
-  0x4308,          # orrs r0, r1
-  0x8010,          # strh r0, [r2, #0]
-  None,            # ldr  r0, [pc, #X]
-  0x6800,          # ldr  r0, [r0, #0]
-  0x6801,          # ldr  r1, [r0, #0]
-  0x2080,          # movs r0, #128
-  0x0280,          # lsls r0, r0, #10
-  0x4281,          # cmp  r1, r0
-  None,            # bne.n OFF
-  0x0d18,          # lsrs r0, r3, #20
-  0x0600,          # lsls r0, r0, #24
-  0x0e00,          # lsrs r0, r0, #24
-])
-flash_v2_verify = packinsts([
-  0xb530,          # push {r4, r5, lr}
-  0xb0c0,          # sub sp, #256
-  0x1c0d,          # adds r5, r1, #0
-  0x0400,          # lsls r0, r0, #16
-  0x0c04,          # lsrs r4, r0, #16
-  None,            # ldr  r2, [pc, X]
-  0x8810,          # ldrh r0, [r2, #0]
-  None,            # ldr  r1, [pc, X]
-  0x4008,          # ands r0, r1
-  0x2103,          # movs r1, #3
-  0x4308,          # orrs r0, r1
-  0x8010,          # strh r0, [r2, #0]
-  None,            # ldr  r0, [pc, X]
-  0x2001,          # movs r0, #1
-  0x4043,          # eors r3, r0
-  0x466a,          # mov  r2, sp
-])
-flash_v1_verify = packinsts([
-  0xb590,          # push    {r4, r7, lr}
-  0xb0c9,          # sub     sp, #292
-  0x466f,          # mov     r7, sp
-  0x6079,          # str     r1, [r7, #4]
-  0x1c39,          # adds    r1, r7, #0
-  0x8008,          # strh    r0, [r1, #0]
-  None,            # ldr     r0, [pc, #X]
-  None,            # ldr     r1, [pc, #X]
-  0x880a,          # ldrh    r2, [r1, #0]
-  None,            # ldr     r3, [pc, #X]
-  0x1c11,          # adds    r1, r2, #0
-  0x4019,          # ands    r1, r3
-  0x1c0a,          # adds    r2, r1, #0
-  0x2303,          # movs    r3, #3
-  0x1c11,          # adds    r1, r2, #0
-])
-# A flavour that only verifes the first N bytes, not present in early versions.
-flash_v3_verifyn = packinsts([
-  0xb570,          # push {r4, r5, r6, lr}
-  0xb0c0,          # sub  sp, #256
-  0x1c0d,          # adds r5, r1, #0
-  0x1c16,          # adds r6, r2, #0
-  0x0402,          # lsls r2, r0, #16
-  0x0c14,          # lsrs r4, r2, #16
-  None,            # ldr  r0, [pc, #X]
-  0x6800,          # ldr  r0, [r0, #0]
-  0x6801,          # ldr  r1, [r0, #0]
-  0x2080,          # movs r0, #128
-  0x0280,          # lsls r0, r0, #10
-  0x4281,          # cmp  r1, r0
-  None,            # bne  off
-  0x0d10,          # lsrs r0, r2, #20
-  0x0600,          # lsls r0, r0, #24
-  0x0e00,          # lsrs r0, r0, #24
-])
-
-
 KNOWN_DEVICE_IDS = {
   0x0000:        0,    # Undefined/default device
   0x3D1F:  64*1024,    # Atmel 64KB (a bit special)
@@ -280,15 +169,14 @@ aproxm_v2 = re.compile(b'...[\\x08\\x09]...[\\x08\\x09]...[\\x08\\x09]...[\\x08\
 def isp2(n):
   return (n & (n-1) == 0) and n != 0
 
-def is_func_prologue(bseq, numargs=0):
+def is_func_prologue(bseq, numargs=0, maxcnt=PROLOGUE_SIZE):
   # Finds a push instruction and allows for some "mov" before that.
-  PROLOGUE_SIZE = 3     # How many insts to check for
   VALID_MOVS = [0x46]   # Allow movs
   # Allow for non-arg regs to be written before the push too
   VALID_MOVS += [0x20 | i for i in range(numargs, 4)]   # Add, mov, sub (+imm)
   VALID_MOVS += [0x30 | i for i in range(numargs, 4)]
   VALID_MOVS += [0x80 | i for i in range(numargs, 4)]
-  insts = [struct.unpack("<H", bseq[i*2:i*2+2])[0] for i in range(PROLOGUE_SIZE)]
+  insts = [struct.unpack("<H", bseq[i*2:i*2+2])[0] for i in range(maxcnt)]
 
   for inst in insts:
     if (inst & 0xFE00) == 0xB400:
@@ -381,17 +269,17 @@ SAVE_STRINGS = {
   b"EEPROM_V125": ("eeprom", None, eeprom_v12x_readfn, eeprom_v12_45_writefn),  # A couple games use this
   b"EEPROM_V126": ("eeprom", None, eeprom_v12x_readfn, eeprom_v126_writefn),    # A handful of games use this
   # Flash versions
-  b"FLASH_V120":    ("flash", "v1", flash_v1_read, flash_v1_verify),                     # ~2 games
-  b"FLASH_V121":    ("flash", "v1", flash_v1_read, flash_v1_verify),                     # ~15 games
-  b"FLASH_V123":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~15 games
-  b"FLASH_V124":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~20 games
-  b"FLASH_V125":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~2 games
-  b"FLASH_V126":    ("flash", "v2", flash_v2_read, flash_v2_verify),                     # ~60 games
-  b"FLASH512_V130": ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~15 games
-  b"FLASH512_V131": ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~70 games
-  b"FLASH512_V133": ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~10 games (2in1 mostly)
-  b"FLASH1M_V102":  ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~20 games
-  b"FLASH1M_V103":  ("flash", "v3", flash_v3_read, flash_v3_verify, flash_v3_verifyn),   # ~50 ROMs (Pokemon)
+  b"FLASH_V120":    ("flash", "v1"),                     # ~2 games
+  b"FLASH_V121":    ("flash", "v1"),                     # ~15 games
+  b"FLASH_V123":    ("flash", "v2"),                     # ~15 games
+  b"FLASH_V124":    ("flash", "v2"),                     # ~20 games
+  b"FLASH_V125":    ("flash", "v2"),                     # ~2 games
+  b"FLASH_V126":    ("flash", "v2"),                     # ~60 games
+  b"FLASH512_V130": ("flash", "v3"),                     # ~15 games
+  b"FLASH512_V131": ("flash", "v3"),                     # ~70 games
+  b"FLASH512_V133": ("flash", "v3"),                     # ~10 games (2in1 mostly)
+  b"FLASH1M_V102":  ("flash", "v3"),                     # ~20 games
+  b"FLASH1M_V103":  ("flash", "v3"),                     # ~50 ROMs (Pokemon)
 
   # SRAM
   b"SRAM_V110":   ("sram", None, None),
@@ -413,10 +301,13 @@ def flash_guess_size(idlist):
 def regexfinder(buf, regex):
   return [hex(x.start()) for x in regex.finditer(buf)]
 
+def is_bx(inst):
+  return (inst & 0xFF87) == 0x4700
+
 def find_bx(rom, start):
   while True:
     inst = struct.unpack("<H", rom[start:start+2])[0]
-    if (inst & 0xFF87) == 0x4700:
+    if is_bx(inst):
       return start
     start += 2
 
@@ -445,28 +336,40 @@ eeprom_savemap = {
   "gba_eeprom": 8*1024,    # No idea, assume worst case
 }
 
-def find_flash_ident(rom):
-  # Find thumb branch instructions and record addresses.
+def decode_thumb_bl(baseaddr, rombytes):
+  lo, hi = struct.unpack("<HH", rombytes)
+  if (lo & 0xF800) == 0xF000 and (hi & 0xF800) == 0xF800:
+    hioff = (lo & 0x7FF) << 12
+    if hioff & 0x400000:
+      hioff -= (1 << 23)
+
+    off = baseaddr + 4 + hioff + (hi & 0x7FF) * 2
+    # Ensure the function starts with a push
+    return off
+  return None
+
+def find_rom_funcs(rom, check_push=4):
+  # Find thumb  branch instructions and record addresses.
   thfuncs = set()
   for i in range(0, len(rom)-2, 2):
-    lo, hi = struct.unpack("<HH", rom[i:i+4])
-    if (lo & 0xF800) == 0xF000 and (hi & 0xF800) == 0xF800:
-      hioff = (lo & 0x7FF) << 12
-      if hioff & 0x400000:
-        hioff -= (1 << 23)
-
-      off = i + 4 + hioff + (hi & 0x7FF) * 2
-      # Ensure the function starts with a push
-      if off > 0 and off < len(rom):
-        opc = struct.unpack("<H", rom[off:off+2])[0]
-        if (opc >> 8) == 0xB5:
+    off = decode_thumb_bl(i, rom[i:i+4])
+    if off is not None and off > 0 and off < len(rom):
+      if check_push:
+        if is_func_prologue(rom[off:off+16], 0, check_push):
           thfuncs.add(off)
+      else:
+        thfuncs.add(off)
+
+  return thfuncs
+
+def find_flash_ident(rom):
+  thfuncs = find_rom_funcs(rom)
 
   # Find critical constants zones
   ranges = []
   for i in range(0, len(rom), 4):
     data = struct.unpack("<I", rom[i:i+4])[0]
-    if data in [0x0E005555, 0x0E002AAA]:
+    if data == 0x0E005555 and constant_in_range(rom, i, DATA_RANGE, 0x0E002AAA):
       ranges.append((max(0, i - EMU_OFFSET_THB), i + EMU_OFFSET_THB))
 
   def readrom(addr):
@@ -476,7 +379,7 @@ def find_flash_ident(rom):
     return None
 
   def store_hook_callback(user_data, write_size, instr, address, value):
-    if value:
+    if value and address:
       if write_size == 8 and (address >> 24) == 0x0E:
         if user_data["seq"] == 0 and address == 0x0E005555 and value == 0xAA:
           user_data["seq"] += 1
@@ -511,6 +414,152 @@ def find_flash_ident(rom):
           })
           break
   return sorted(ret, key=lambda x: tuple(x.items()))
+
+def find_flash_read_verify(rom, flash_128):
+  READ_VERIFY_FUNC_SIZE = 128
+  thfuncs0 = find_rom_funcs(rom, check_push=0)
+  thfuncsN = find_rom_funcs(rom)
+
+  def readrom(addr):
+    romaddr = (addr & 0x1FFFFFF)
+    if romaddr + 4 <= len(rom):
+      return struct.unpack("<I", rom[romaddr: romaddr+4])[0]
+    return None
+
+  def store_hook_callback(user_data, write_size, instr, address, value):
+    if address == 0x04000204:
+      user_data["waitcnt_wr"] = True
+    elif value and address:
+      if write_size == 8 and (address >> 24) == 0x0E:
+        if user_data["seq"] == 0 and address == 0x0E005555 and value == 0xAA:
+          user_data["seq"] += 1
+        elif user_data["seq"] == 1 and address == 0x0E002AAA and value == 0x55:
+          user_data["seq"] += 1
+        elif user_data["seq"] == 2 and address == 0x0E005555 and value == 0xB0:
+          user_data["found"] = True
+        else:
+          user_data["seq"] = 0
+
+  def loadw_hook_callback(user_data, write_size, instr, address, value):
+    if address == 0x04000204:
+      user_data["waitcnt_rd"] = True
+
+  # Find function start in each range
+  def find_funcs(thfns, rom, ranges, check_bs=False, check_waitcnt=False):
+    ret = []
+    for s, e in ranges:
+      for i in range(e, s, -2):
+        if i in thfns:
+          # Execute the current block, see if that brings a flash-ident sequence
+          cpust = arm.CPUState(EMU_STCK - 128)
+
+          usr_data = {"seq": 0, "found": False, "waitcnt_wr": False, "waitcnt_rd": False}
+          def stcb(*args): store_hook_callback(usr_data, *args)
+          def ldcb(*args): loadw_hook_callback(usr_data, *args)
+          ex = arm.InstExecutor(cpust, store_cb=stcb, load_cb=ldcb)
+          for j in range(i, e, 2):
+            op = struct.unpack("<H", rom[j:j+2])[0]
+            ex.addinst(arm.ThumbInst(ex, ROM_ADDR + j, op, readrom))
+            if is_bx(op):
+              break
+          ex.execute()
+          if not check_bs or usr_data["found"]:
+            if not check_waitcnt or (usr_data["waitcnt_wr"] and usr_data["waitcnt_rd"]):
+              ret.append({
+                "addr": hex(i),
+                "size": find_bx(rom, i) + 2 - i,
+              })
+              break
+    return sorted([dict(t) for t in {tuple(d.items()) for d in ret}], key=lambda x: tuple(x.items()))
+
+  # Finds the bankswitching function
+  ranges = []
+  for i in range(0, len(rom), 4):
+    data = struct.unpack("<I", rom[i:i+4])[0]
+    if data == 0x0E005555:
+      if constant_in_range(rom, i, DATA_RANGE, 0x0E002AAA):
+        ranges.append((max(0, i - EMU_OFFSET_THB), i))
+
+  # The function is small, around ~32 bytes or so
+  candidates = find_funcs(thfuncs0, rom, ranges, check_bs=True)
+  candidates = [x for x in candidates if x["size"] < 64]
+  banksw = [int(x["addr"], 16) for x in candidates]
+
+  # Now find functions candidate to read/verify.
+  # We only now for sure that:
+  # They read/write WAITCNT and bankswitch (via call or inlined).
+  ranges = []
+  for i in range(0, len(rom), 4):
+    data = struct.unpack("<I", rom[i:i+4])[0]
+    if data == 0x04000204:
+      ranges.append((max(0, i - EMU_OFFSET_THB), i))
+
+  # Candidates: functions that do bankswitching and waitcnt writes
+  bs_candidates = find_funcs(thfuncsN, rom, ranges, check_bs=True, check_waitcnt=True)
+  nbs_candidates = find_funcs(thfuncsN, rom, ranges, check_bs=False, check_waitcnt=True)
+
+  # Checks whether the candidate function has a BS call (via BL)
+  def check_entry(entry):
+    start = int(entry["addr"], 16)
+    end = start + entry["size"]
+    for i in range(start, end, 2):
+      off = decode_thumb_bl(i, rom[i:i+4])
+      if off is not None and off > 0 and off < len(rom):
+        if off in banksw:
+          return True
+    return False
+
+  # Filter candidates that do not bank switch!
+  if flash_128:
+    nbs_candidates = [x for x in nbs_candidates if check_entry(x)]
+  candidates = bs_candidates + nbs_candidates
+
+  # Find LDR PCrel that load two function pointers (ie. thumb)
+  # These copy a routine to stack and execute it there.
+  def load_hook_callback(user_data, load_size, instr, address, value):
+    if address and value and load_size == 32:
+      # The load must be PC-rel and read ROM thumb pointers
+      if (value & 1) == 1 and (value >> 25) == 0x4:
+        user_data["ptrs"].append(value)
+
+  # Find function start in each range
+  rver, rread = [], []
+  for c in candidates:
+    cpust = arm.CPUState(EMU_STCK - 128)
+    usr_data = {"ptrs": []}
+    def ldcb(*args): load_hook_callback(usr_data, *args)
+    ex = arm.InstExecutor(cpust, load_cb=ldcb)
+    start = int(c["addr"], 16)
+    end = start + c["size"]
+    for j in range(start, end, 2):
+      op = struct.unpack("<H", rom[j:j+2])[0]
+      ex.addinst(arm.ThumbInst(ex, ROM_ADDR + j, op, readrom))
+    ex.execute()
+
+    ptrs = sorted(set(usr_data["ptrs"]))
+    if len(ptrs) == 2 and ptrs[1] - ptrs[0] < READ_VERIFY_FUNC_SIZE:
+      fn_start, fn_end = ptrs[0] & 0x1FFFFFE, ptrs[1] & 0x1FFFFFE
+      cpust = arm.CPUState(EMU_STCK - 128)
+      usr_data = {"ld": {8: 0, 16: 0, 32: 0}, "st": {8: 0, 16: 0, 32: 0}}
+      def ldcb(load_size, instr, address, value): usr_data["ld"][load_size] += 1
+      def stcb(store_size, instr, address, value): usr_data["st"][store_size] += 1
+      ex = arm.InstExecutor(cpust, load_cb=ldcb, store_cb=stcb)
+      for j in range(fn_start, fn_end, 2):
+        op = struct.unpack("<H", rom[j:j+2])[0]
+        ex.addinst(arm.ThumbInst(ex, ROM_ADDR + j, op, readrom))
+      ex.execute()
+
+      # Verify functions load two bytes and compare them, read function does ld+st
+      if usr_data["ld"][8] == 1 and usr_data["st"][8] == 1:
+        rread.append(c)
+      elif usr_data["ld"][8] == 2 and usr_data["st"][8] == 0:
+        rver.append(c)
+
+  rread = sorted([dict(t) for t in {tuple(d.items()) for d in rread}], key=lambda x: tuple(x.items()))
+  rver  = sorted([dict(t) for t in {tuple(d.items()) for d in rver }], key=lambda x: tuple(x.items()))
+
+  return (rread, rver)
+
 
 def lookup_eeprom_size(savetypes_3p, gcode):
   for db in savetypes_3p:
@@ -599,25 +648,22 @@ def process_rom(rom, **kwargs):
           targets["eeprom"]["target-info"]["eeprom-size"] = guessed_size
     elif gentype == "flash":
       # Ident flash and read functions are found using the regular method!
-      readfn, *verifns = fnhooks
-      rd_tgts = parse_fns_thumb(rom, regexfinder(rom, readfn))
       id_tgts = find_flash_ident(rom)
-      ve_tgts = []
-      for m in verifns:
-        ve_tgts += regexfinder(rom, m)
-      ve_tgts = parse_fns_thumb(rom, ve_tgts)
 
       # Find the per-device functions by finding the device impl. table
       res = find_flash_tables(rom)
 
+      flashsize = flash_guess_size([x["device_id"] for x in res])
+      rd_tgts, ve_tgts = find_flash_read_verify(rom, flashsize == 128*1024)
+
       assert "flash" not in targets
 
-      if res and id_tgts and rd_tgts and ve_tgts:
+      if res and id_tgts and rd_tgts:
         targets["flash"] = {
           "subtype": stype.decode("ascii"),
           "target-info": {
             "avail_devids": sorted(set([x["device_id"] for x in res])),
-            "flash-size": flash_guess_size([x["device_id"] for x in res]),
+            "flash-size": flashsize,
             "ident": id_tgts,
             "read": rd_tgts,
             "verify": ve_tgts,
