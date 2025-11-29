@@ -351,7 +351,7 @@ def decode_thumb_bl(baseaddr, rombytes):
 def find_rom_funcs(rom, check_push=4):
   # Find thumb  branch instructions and record addresses.
   thfuncs = set()
-  for i in range(0, len(rom)-2, 2):
+  for i in range(0, len(rom)-4, 2):
     off = decode_thumb_bl(i, rom[i:i+4])
     if off is not None and off > 0 and off < len(rom):
       if check_push:

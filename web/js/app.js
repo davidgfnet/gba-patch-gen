@@ -17,7 +17,7 @@ var pyodide = null;
 async function main() {
   async function loadpy() {
     pyodide = await loadPyodide();
-    let response = await fetch("../py/patchtool-0.2.0-py3-none-any.whl");
+    let response = await fetch("../py/patchtool-0.2.1-py3-none-any.whl");
     var buf = await response.arrayBuffer();
     await pyodide.unpackArchive(buf, "wheel");
     pyodide.pyimport("patchtool");
@@ -47,6 +47,9 @@ async function main() {
   var patch_ret = async function (event) {
     var r = JSON.parse(event.data.result);
     patchmap[event.data.type] = r;
+
+    if (r["result"] == "err")
+      console.log(r);
 
     // Update the status DIV with the current patches
     var st = render_status();
@@ -144,6 +147,16 @@ async function main() {
     };
     if (fs.files && fs.files.length > 0)
       imap["sym"] = fs.files[0];
+
+    if (!fm.files[0]) {
+      alert("You need to pick a GBA ROM!");
+      return;
+    }
+
+    if (fm.files[0].size > 32*1024*1024) {
+      alert("GBA rom exceeds 32MiB!");
+      return;
+    }
 
     try {
       loadFiles(imap, (arrays) => {
