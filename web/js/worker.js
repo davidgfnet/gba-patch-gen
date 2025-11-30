@@ -9,7 +9,7 @@ importScripts("pyodide.js");
 async function pyload() {
   // Load python interpreter and the patchtool.
   self.pyodide = await loadPyodide();
-  let response = await fetch("../py/patchtool-0.2.1-py3-none-any.whl");
+  let response = await fetch("../py/patchtool-0.2.2-py3-none-any.whl");
   var buf = await response.arrayBuffer();
   await self.pyodide.unpackArchive(buf, "wheel");
   self.pyodide.pyimport("patchtool");

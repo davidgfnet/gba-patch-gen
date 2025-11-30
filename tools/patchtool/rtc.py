@@ -1,125 +1,161 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright 2024 David Guillen Fandos <david@davidgf.net>
+# Copyright 2025 David Guillen Fandos <david@davidgf.net>
 
 # Automatic RTC patch detector and genertor.
 # We aim to detect certain functions that handle the SII (S-3511A)
 # RTC device, mapped via GPIO registers.
 #
-# We use signatures, since the functions we want to capture are rather simple
+# We use some emulation and detect writes to GPIO ports.
 #
 # Use pypy to run this, it's 20x faster than regular python :)
 
 import struct, re, hashlib
-
-# Having some issues with regexes and overlapping matches and whatnot
-def match_insts(data, mseq):
-  initseq = mseq[:mseq.index(None)]
-  initm = b"".join(struct.pack("<H", x) for x in initseq)
-  ret = []
-  off = 0
-  while True:
-    off = data.find(initm, off)
-    if off < 0:
-      break
-    if all(mseq[j] is None or mseq[j] == (data[off+j*2] | (data[off+j*2+1] << 8)) for j in range(len(mseq))):
-      ret.append(off)
-    off += 2
-  return ret
-
-siirtc_probe_fn = [
-  0xb580,       # push {r7, lr}
-  0xb084,       # sub sp, #16
-  0x466f,       # mov r7, sp
-  0x1d39,       # adds r1, r7, #4
-  0x1c08,       # adds r0, r1, #0
-  0xf000, None, # bl off
-  0x0601,       # lsls r1, r0, #24
-  0x0e08,       # lsrs r0, r1, #24
-  0x2800,       # cmp r0, #0
-  None,         # bne.n off
-  0x2000,       # movs    r0, #0
-]
-
-siirtc_getstatus_fn = [
-  0xb590,       # push {r4, r7, lr}
-  0xb082,       # sub sp, #8
-  0x466f,       # mov r7, sp
-  0x6038,       # str r0, [r7, #0]
-  0x4802,       # ldr r0, [pc, #8]
-  0x7801,       # ldrb r1, [r0, #0]
-  0x2901,       # cmp r1, #1
-  None,         # bne.n off
-  0x2000,       # movs r0, #0
-  None,         # b.n off
-  None, None,   # [pool data]
-  None,         # ldr r0, [pc, #X]
-  0x2101,       # movs r1, #1
-  0x7001,       # strb r1, [r0, #0]
-  None,         # ldr r0, [pc, #X]
-  0x2101,       # movs r1, #1
-  0x8001,       # strh r1, [r0, #0]
-  None,         # ldr r0, [pc, #X]
-  0x2105,       # movs r1, #5
-  0x8001,       # strh r1, [r0, #0]
-  # Need lots of insts, since setstatus is very similar
-  None,         # ldr r0, [pc, #X]
-  0x2107,       # movs r1, #7
-  0x8001,       # strh r1, [r0, #0]
-]
-
-siirtc_getdatetime_fn = [
-  0xb580,       # push {r7, lr}
-  0xb082,       # sub sp, #8
-  0x466f,       # mov r7, sp
-  0x6038,       # str r0, [r7, #0]
-  0x4802,       # ldr r0, [pc, #8]
-  0x7801,       # ldrb r1, [r0, #0]
-  0x2901,       # cmp r1, #1
-  None,         # bne.n off
-  0x2000,       # movs r0, #0
-  None,         # b.n off
-  None, None,   # [pool data]
-  None,         # ldr r0, [pc, #X]
-  0x2101,       # movs r1, #1
-  0x7001,       # strb r1, [r0, #0]
-  None,         # ldr r0, [pc, #X]
-  0x2101,       # movs r1, #1
-  0x8001,       # strh r1, [r0, #0]
-  None,         # ldr r0, [pc, #X]
-  0x2105,       # movs r1, #5
-  0x8001,       # strh r1, [r0, #0]
-  None,         # ldr r0, [pc, #X]
-  0x2107,       # movs r1, #7
-  0x8001,       # strh r1, [r0, #0]
-  0x2065,       # movs r0, #101   # This distinguishes set/get
-]
-
-siirtc_reset_fn = [
-  0xb580,       # push {r7, lr}
-  0xb084,       # sub sp, #16
-  0x466f,       # mov r7, sp
-  0x4803,       # ldr r0, [pc, #12]
-  0x7801,       # ldrb r1, [r0, #0]
-  0x2901,       # cmp r1, #1
-  None,         # bne.n off
-  0x2000,       # movs r0, #0
-]
-
+import patchtool.arm as arm
 
 RTC_STRING = b"SIIRTC_V001"
+ROM_ADDR = 0x08000000
+EMU_STCK = 0x02008000             # Use some "reasonable" and plausible SP
+DATA_RANGE = 1024
+PROLOGUE_SIZE = 3
 
-# Finds all matches for a buffer and a substring
+def is_func_prologue(bseq, numargs=0, maxcnt=PROLOGUE_SIZE):
+  # Finds a push instruction and allows for some "mov" before that.
+  VALID_MOVS = [0x46]   # Allow movs
+  # Allow for non-arg regs to be written before the push too
+  VALID_MOVS += [0x20 | i for i in range(numargs, 4)]   # Add, mov, sub (+imm)
+  VALID_MOVS += [0x30 | i for i in range(numargs, 4)]
+  VALID_MOVS += [0x80 | i for i in range(numargs, 4)]
+  insts = [struct.unpack("<H", bseq[i*2:i*2+2])[0] for i in range(maxcnt)]
+
+  for inst in insts:
+    if (inst & 0xFE00) == 0xB400:
+      return True    # Found push inst
+    elif (inst >> 8) not in VALID_MOVS:
+      return False
+
+  return False
+
+def decode_thumb_bl(baseaddr, rombytes):
+  lo, hi = struct.unpack("<HH", rombytes)
+  if (lo & 0xF800) == 0xF000 and (hi & 0xF800) == 0xF800:
+    hioff = (lo & 0x7FF) << 12
+    if hioff & 0x400000:
+      hioff -= (1 << 23)
+
+    off = baseaddr + 4 + hioff + (hi & 0x7FF) * 2
+    # Ensure the function starts with a push
+    return off
+  return None
+
 def find_bx(rom, start):
-  while True:
+  while start < len(rom) - 4:
     inst = struct.unpack("<H", rom[start:start+2])[0]
     if (inst & 0xFF87) == 0x4700:
       return start
     start += 2
 
-def regexfinder(buf, seq):
-  return [{"addr": hex(x), "size": find_bx(buf, x) + 2 - x} for x in match_insts(buf, seq)]
+  return 0
+
+def constant_in_range(rom, offset, drange, constant):
+  for i in range(offset - drange, offset + drange, 4):
+    if i >= 0 and i + 4 <= len(rom):
+      data = struct.unpack("<I", rom[i:i+4])[0]
+      if data == constant:
+        return True
+  return False
+
+def find_rom_funcs(rom, check_push=4):
+  # Find thumb  branch instructions and record addresses.
+  thfuncs = set()
+  for i in range(0, len(rom)-4, 2):
+    off = decode_thumb_bl(i, rom[i:i+4])
+    if off is not None and off > 0 and off < len(rom):
+      if check_push:
+        if is_func_prologue(rom[off:off+16], 0, check_push):
+          thfuncs.add(off)
+      else:
+        thfuncs.add(off)
+
+  return thfuncs
+
+def find_rtc_func(rom):
+  thfuncs = find_rom_funcs(rom)
+
+  ret = {}
+  for c in thfuncs:
+    if (constant_in_range(rom, c, DATA_RANGE, 0x080000C4) and
+        constant_in_range(rom, c, DATA_RANGE, 0x080000C6)):
+
+      fnend = find_bx(rom, c) + 2
+
+      # Find some hallmarks of SiiRTC functions via emulation
+
+      def readrom(addr):
+        romaddr = (addr & 0x1FFFFFF)
+        if romaddr + 4 <= len(rom):
+          return struct.unpack("<I", rom[romaddr: romaddr+4])[0]
+        return None
+
+      def store_hook_callback(user_data, write_size, instr, address, value):
+        if address == 0x080000C4 and value == 0x1 and user_data["seq"] == 0:
+          user_data["seq"] = 1
+        elif address == 0x080000C4 and value == 0x5 and user_data["seq"] == 1:
+          user_data["seq"] = 2
+        elif address == 0x080000C6 and value == 0x7 and user_data["seq"] == 2:
+          user_data["seq"] = 3
+
+      usr_data = {"seq": 0, "mov": []}
+      def stcb(*args): store_hook_callback(usr_data, *args)
+      cpust = arm.CPUState(EMU_STCK - 128)
+      ex = arm.InstExecutor(cpust, store_cb=stcb)
+      for j in range(c, fnend, 2):
+        op = struct.unpack("<H", rom[j:j+2])[0]
+        ex.addinst(arm.ThumbInst(ex, ROM_ADDR + j, op, readrom))
+        # Inst mov rX, 0x6Y  (2XII)
+        if op & 0xF8F0 == 0x2060:
+          usr_data["mov"].append(op & 0xFF)
+      ex.execute()
+      if usr_data["seq"] >= 2 and usr_data["mov"]:
+        # This can be several SiiRTC functions, we identify them by command ID.
+        opmap = {
+          0x60: "reset",
+          0x62: "setstatus",
+          0x63: "getstatus",
+          0x64: "setdatetime",
+          0x65: "getdatetime",
+          0x66: "settime",
+          0x67: "gettime",
+          0x68: "getalarm",
+          0x69: "setalarm",
+        }
+        ops = [opmap[x] for x in usr_data["mov"]]
+        if len(ops) > 1:
+          if "reset" in ops and "setstatus" in ops:
+            ops = ["reset"]    # Reset calls set status, might be inlined
+          else:
+            ops = []
+
+        if ops:
+          ret[c] = (ops[0], fnend - c)
+
+  # Find RTC probe, usually calls getstatus, reset, and gettime
+  for c in thfuncs:
+    fnend = find_bx(rom, c) + 2
+
+    missing = set({"getstatus", "reset", "gettime"})
+    for i in range(c, fnend-4, 2):
+      off = decode_thumb_bl(i, rom[i:i+4])
+      if off is not None and off > 0 and off < len(rom):
+        if off in ret:
+          if ret[off][0] in missing:
+            missing.remove(ret[off][0])
+
+    if len(missing) <= 1:
+      ret[c] = ("probe", fnend - c)
+
+  return {v[0]: (k, v[1]) for k,v in ret.items()}
 
 def process_rom(rom, **kwargs):
   # Add ROM and index by gamecode/version
@@ -129,30 +165,29 @@ def process_rom(rom, **kwargs):
   if RTC_STRING not in rom:
     return None
 
-  probe_tgt = regexfinder(rom, siirtc_probe_fn)
-  getst_tgt = regexfinder(rom, siirtc_getstatus_fn)
-  gettd_tgt = regexfinder(rom, siirtc_getdatetime_fn)
-  reset_tgt = regexfinder(rom, siirtc_reset_fn)
-  if len(probe_tgt) != 1 or len(getst_tgt) != 1 or len(gettd_tgt) != 1 or len(reset_tgt) != 1:
-    return None
+  fns = find_rtc_func(rom)
+  fns = {k: {"addr": hex(v[0]), "size": v[1]} for k,v in fns.items()}
 
-  targets = {
-    "probe_fn": probe_tgt[0],
-    "getstatus_fn": getst_tgt[0],
-    "gettimedate_fn": gettd_tgt[0],
-    "reset_fn": reset_tgt[0],
-  }
-
-  return ({
-    "filesize": len(rom),
-    "sha256": hashlib.sha256(rom).hexdigest(),
-    "sha1": hashlib.sha1(rom).hexdigest(),
-    "md5": hashlib.md5(rom).hexdigest(),
-    "game-code": gcode,
-    "game-version": grev,
-    "targets": {
-      "rtc": targets
+  if "reset" in fns and "getdatetime" in fns and "getstatus" in fns:
+    targets = {
+      "getstatus_fn": fns["getstatus"],
+      "gettimedate_fn": fns["getdatetime"],
+      "gettime_fn": fns["gettime"],
+      "reset_fn": fns["reset"],
     }
-  })
+    if "probe" in fns:
+      targets["probe_fn"] = fns["probe"]
+
+    return ({
+      "filesize": len(rom),
+      "sha256": hashlib.sha256(rom).hexdigest(),
+      "sha1": hashlib.sha1(rom).hexdigest(),
+      "md5": hashlib.md5(rom).hexdigest(),
+      "game-code": gcode,
+      "game-version": grev,
+      "targets": {
+        "rtc": targets
+      }
+    })
 
 

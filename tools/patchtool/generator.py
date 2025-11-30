@@ -321,10 +321,10 @@ def gen_eeprom_patch(eeprom_info):
 
 def gen_rtc_patch(rtc_info):
   ret = []
-  ret += gen_rtc_opc(int(rtc_info["probe_fn"]["addr"], 16), RTC_PROBE_HNDLR)
-  ret += gen_rtc_opc(int(rtc_info["reset_fn"]["addr"], 16), RTC_RESET_HNDLR)
-  ret += gen_rtc_opc(int(rtc_info["getstatus_fn"]["addr"], 16), RTC_STSRD_HNDLR)
-  ret += gen_rtc_opc(int(rtc_info["gettimedate_fn"]["addr"], 16), RTC_GETTD_HNDLR)
+  for fn, op in [("probe_fn", RTC_PROBE_HNDLR), ("reset_fn", RTC_RESET_HNDLR),
+                 ("getstatus_fn", RTC_STSRD_HNDLR), ("gettimedate_fn", RTC_GETTD_HNDLR)]:
+    if fn in rtc_info:
+      ret += gen_rtc_opc(int(rtc_info[fn]["addr"], 16), op)
   return ret
 
 def gen_layout_patch(layout_info, romsize):

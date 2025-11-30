@@ -17,7 +17,7 @@ var pyodide = null;
 async function main() {
   async function loadpy() {
     pyodide = await loadPyodide();
-    let response = await fetch("../py/patchtool-0.2.1-py3-none-any.whl");
+    let response = await fetch("../py/patchtool-0.2.2-py3-none-any.whl");
     var buf = await response.arrayBuffer();
     await pyodide.unpackArchive(buf, "wheel");
     pyodide.pyimport("patchtool");
