@@ -95,6 +95,7 @@ async function main() {
         const f = new File([pbuf], bname + '.patch', { type: "octet/stream" });
         const u = URL.createObjectURL(f);
         document.getElementById('downbut').href = u;
+        document.getElementById('downbut').download = bname + '.patch';
 
       } else {
         st = "An error occured: " + pbin.data;
