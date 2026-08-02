@@ -99,11 +99,16 @@ def find_rtc_func(rom):
         return None
 
       def store_hook_callback(user_data, write_size, instr, address, value):
-        if address == 0x080000C4 and value == 0x1 and user_data["seq"] == 0:
+        if not address.known() or not value.known():
+          return
+
+        addr = address.uint()
+        uval = value.uint()
+        if addr == 0x080000C4 and uval == 0x1 and user_data["seq"] == 0:
           user_data["seq"] = 1
-        elif address == 0x080000C4 and value == 0x5 and user_data["seq"] == 1:
+        elif addr == 0x080000C4 and uval == 0x5 and user_data["seq"] == 1:
           user_data["seq"] = 2
-        elif address == 0x080000C6 and value == 0x7 and user_data["seq"] == 2:
+        elif addr == 0x080000C6 and uval == 0x7 and user_data["seq"] == 2:
           user_data["seq"] = 3
 
       usr_data = {"seq": 0, "mov": []}

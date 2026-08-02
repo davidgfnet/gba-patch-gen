@@ -379,13 +379,15 @@ def find_flash_ident(rom):
     return None
 
   def store_hook_callback(user_data, write_size, instr, address, value):
-    if value and address:
-      if write_size == 8 and (address >> 24) == 0x0E:
-        if user_data["seq"] == 0 and address == 0x0E005555 and value == 0xAA:
+    if value.known() and address.known():
+      addrv = address.uint()
+      uval = value.uint()
+      if write_size == 8 and (addrv >> 24) == 0x0E:
+        if user_data["seq"] == 0 and addrv == 0x0E005555 and uval == 0xAA:
           user_data["seq"] += 1
-        elif user_data["seq"] == 1 and address == 0x0E002AAA and value == 0x55:
+        elif user_data["seq"] == 1 and addrv == 0x0E002AAA and uval == 0x55:
           user_data["seq"] += 1
-        elif user_data["seq"] == 2 and address == 0x0E005555 and value == 0x90:
+        elif user_data["seq"] == 2 and addrv == 0x0E005555 and uval == 0x90:
           user_data["found"] = True
         else:
           user_data["seq"] = 0
@@ -427,21 +429,23 @@ def find_flash_read_verify(rom, flash_128):
     return None
 
   def store_hook_callback(user_data, write_size, instr, address, value):
-    if address == 0x04000204:
+    if address.known() and address.uint() == 0x04000204:
       user_data["waitcnt_wr"] = True
-    elif value and address:
-      if write_size == 8 and (address >> 24) == 0x0E:
-        if user_data["seq"] == 0 and address == 0x0E005555 and value == 0xAA:
+    elif value.known() and address.known():
+      addrv = address.uint()
+      uval = value.uint()
+      if write_size == 8 and (addrv >> 24) == 0x0E:
+        if user_data["seq"] == 0 and addrv == 0x0E005555 and uval == 0xAA:
           user_data["seq"] += 1
-        elif user_data["seq"] == 1 and address == 0x0E002AAA and value == 0x55:
+        elif user_data["seq"] == 1 and addrv == 0x0E002AAA and uval == 0x55:
           user_data["seq"] += 1
-        elif user_data["seq"] == 2 and address == 0x0E005555 and value == 0xB0:
+        elif user_data["seq"] == 2 and addrv == 0x0E005555 and uval == 0xB0:
           user_data["found"] = True
         else:
           user_data["seq"] = 0
 
   def loadw_hook_callback(user_data, write_size, instr, address, value):
-    if address == 0x04000204:
+    if address.known() and address.uint() == 0x04000204:
       user_data["waitcnt_rd"] = True
 
   # Find function start in each range
@@ -517,10 +521,11 @@ def find_flash_read_verify(rom, flash_128):
   # Find LDR PCrel that load two function pointers (ie. thumb)
   # These copy a routine to stack and execute it there.
   def load_hook_callback(user_data, load_size, instr, address, value):
-    if address and value and load_size == 32:
+    if address.known() and value.known() and load_size == 32:
       # The load must be PC-rel and read ROM thumb pointers
-      if (value & 1) == 1 and (value >> 25) == 0x4:
-        user_data["ptrs"].append(value)
+      uval = value.uint()
+      if (uval & 1) == 1 and (uval >> 25) == 0x4:
+        user_data["ptrs"].append(uval)
 
   # Find function start in each range
   rver, rread = [], []

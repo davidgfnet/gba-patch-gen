@@ -132,7 +132,7 @@ def validate_arm_ldr(rom, ldr_addr, regn, str_off, max_gap_size=8):
   return None
 
 def store_hook_callback(user_data, write_size, instr, address, value):
-  if write_size == 32 and address == TGT_ADDRESS:
+  if write_size == 32 and address.known() and address.uint() == TGT_ADDRESS:
     user_data["stores"].append(instr.pc())
 
 # Emulates an ARM code chunk and tries to find STR instructions

@@ -23,6 +23,7 @@
 
 import struct, hashlib
 import patchtool.arm as arm
+import patchtool.provenance as provenance
 
 EMU_OFFSET     = 2048             # Some reasonable amount
 EMU_OFFSET_THB = 2048             # Captures all thumb loads
@@ -67,11 +68,12 @@ def clear_bad_seqs(romarr):
         break
   return romarr
 
-def store_hook_callback(user_data, write_size, instr, address, value):
+def store_hook_callback(user_data, cpust, write_size, instr, address, value):
   if address:
     if write_size == 8:
-      address &= ~1
-    if address == TGT_ADDR:
+      address = address >> 1
+      address = address << 1
+    if address.known() and address.uint() == TGT_ADDR:
       if write_size == 8:
         if instr.inst_type() == "thumb":
           if instr.imm_value() is None:
@@ -82,7 +84,14 @@ def store_hook_callback(user_data, write_size, instr, address, value):
             if instr.imm_value() >= 2:
               # Instructions like STRB rX, [rA + imm] use immediates of 0 or 1, usually.
               return
-      user_data["stores"][write_size].append(instr.pc())
+
+      # Using provenance we check the bits we care about, any other writes are usually fine.
+      # Bits [2-10] (ROM access time) as well as bit 14 (prefetch) are important to us.
+      mask = cpust.provenance().from_uint(0x47FC, 16)
+      new_value = value.get_lsb(16) & mask
+      old_prov = cpust.provenance().mem_init_val(TGT_ADDR, num_bits=16) & mask
+      if new_value != old_prov:
+        user_data["stores"][write_size].append(instr.pc())
 
 # Emulates a thumb code chunk and tries to find STR instructions
 # that write the WAITCNT register
@@ -97,7 +106,7 @@ def emulate_thumb_insts(start, end, rom):
 
   subrom = clear_bad_seqs(rom[start:end])
   usr_data = {"stores": {8: [], 16: [], 32: []}}
-  def stcb(*args): store_hook_callback(usr_data, *args)
+  def stcb(*args): store_hook_callback(usr_data, cpust, *args)
   ex = arm.InstExecutor(cpust, store_cb=stcb)
   for i in range(0, end - start, 2):
     op = struct.unpack("<H", subrom[i:i+2])[0]
@@ -119,7 +128,7 @@ def emulate_arm_insts(start, end, rom):
 
   subrom = clear_bad_seqs(rom[start:end])
   usr_data = {"stores": {8: [], 16: [], 32: []}}
-  def stcb(*args): store_hook_callback(usr_data, *args)
+  def stcb(*args): store_hook_callback(usr_data, cpust, *args)
   ex = arm.InstExecutor(cpust, store_cb=stcb)
   for i in range(0, end - start, 4):
     op = struct.unpack("<I", subrom[i:i+4])[0]
@@ -130,7 +139,8 @@ def emulate_arm_insts(start, end, rom):
 
 def process_rom(rom, **kwargs):
   targets = []
-  for i in range(0, len(rom) & ~3, 4):
+  romsize = len(rom) & ~3
+  for i in range(0, romsize, 4):
     v = struct.unpack("<I", rom[i:i+4])[0]
     # Checks for a wide range of constants.
     if v >= 0x04000000 and v <= 0x04000208 and (v & 1) == 0:
@@ -138,7 +148,7 @@ def process_rom(rom, **kwargs):
       # (also a bit after, since sometimes the value is used right after!)
       emustart_thb = max(0, i - EMU_OFFSET_THB)
       emustart_arm = max(0, i - EMU_OFFSET_ARM)
-      emuend = min(i + EMU_OFFSET_EX, len(rom))
+      emuend = min(i + EMU_OFFSET_EX, romsize)
       # No idea what kind of code we found: assume thumb
       for str_type, str_off in emulate_thumb_insts(emustart_thb, emuend, rom):
         targets.append({
@@ -162,6 +172,9 @@ def process_rom(rom, **kwargs):
           "inst-type": "%s-arm" % str_type,
           "inst-offset": hex(str_off),
         })
+
+    if "progresscb" in kwargs and (i & 0xFFFF) == 0:
+      kwargs["progresscb"](i / romsize)
 
   # Dedup entries (happens with ARM code)
   targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["inst-offset"])

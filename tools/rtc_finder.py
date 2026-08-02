@@ -6,13 +6,6 @@
 import os, sys, multiprocessing, tqdm, json
 import patchtool.rtc
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      flist.append(f)
-
 def wrapper(f):
   ret = patchtool.rtc.process_rom(open(f, "rb").read())
   if ret is None:
@@ -23,11 +16,19 @@ def wrapper(f):
   }
   return ret | finfo
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  patches = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
+if __name__ == "__main__":
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        flist.append(f)
 
-patches = filter(lambda x: x, patches)
-patches = sorted(patches, key=lambda x:x["filename"])
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    patches = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
-print(json.dumps(patches, indent=2, sort_keys=True))
+  patches = filter(lambda x: x, patches)
+  patches = sorted(patches, key=lambda x:x["filename"])
+
+  print(json.dumps(patches, indent=2, sort_keys=True))
 

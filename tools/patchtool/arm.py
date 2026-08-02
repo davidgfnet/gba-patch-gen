@@ -9,6 +9,7 @@
 # (at least properly).
 
 import heapq
+import patchtool.provenance as provenance
 
 def asr32(val, amount):
   if amount == 0:
@@ -25,9 +26,15 @@ def asr32(val, amount):
     else:
       return val >> amount
 
-def add32(x, y): return (x + y) & 0xFFFFFFFF
-def sub32(x, y): return (x - y) & 0xFFFFFFFF
-def rsb32(x, y): return (y - x) & 0xFFFFFFFF
+def emu_asr32_imm(val, amount):
+  sbit = val.get_bit(31)
+  if amount >= 31:
+    return sbit.replicate(32)
+  return val.get_lsb(32 - amount) @ sbit.replicate(amount)
+
+def add32(x, y): return x + y
+def sub32(x, y): return x - y
+def rsb32(x, y): return y - x
 
 MEM_IDX_PRE = 0
 MEM_IDX_PRE_WB = 1
@@ -113,12 +120,17 @@ class CPUState(object):
 
   def reset(self):
     self.memmap = {}
-    self.regs = [None] * 16
-    self.regs[REG_SP] = self._ispptr
+    self._provst = provenance.ProvenanceState()
+    self.regs = [self._provst.reg_init_val32(i) for i in range(16)]
+    self.regs[REG_SP] = self._provst.from_uint(self._ispptr)
+
+  def provenance(self):
+    return self._provst
 
   def copy(self):
     ns = CPUState.__new__(CPUState)
     ns._ispptr = self._ispptr
+    ns._provst = self._provst
     ns.regs = self.regs[:]
     ns.memmap = dict(self.memmap)
     ns._branch_state = {
@@ -129,7 +141,7 @@ class CPUState(object):
 
   def regreset(self, rl):
     for rn in rl:
-      self.regs[rn] = None
+      self.regs[rn] = self._provst.fresh_uint()
 
   def snapshot_branch(self, target_pc):
     self._branch_state[target_pc] = {
@@ -146,21 +158,24 @@ class CPUState(object):
       self.reset()
 
   def _load_data(self, addr, sz):
-    ret = 0
-    for i, a in enumerate(range(addr, addr+sz)):
-      if a not in self.memmap or self.memmap[a] is None:
-        return None
-      ret = ret | (self.memmap[a] << (i * 8))
-    return ret
+    if addr.known():
+      ret = self._provst.fresh_uint(num_bits=0)
+      addrv = addr.uint()
+      for i, a in enumerate(range(addrv, addrv+sz)):
+        if a not in self.memmap:
+          blk = self._provst.mem_init_val(a, num_bits=8)
+        else:
+          blk = self.memmap[a]
+        ret = ret @ blk
+      return ret
+    else:
+      return self._provst.fresh_uint(num_bits=sz*8)
 
   def _store_data(self, addr, value, sz):
-    if addr is not None:
-      if value is None:
-        for i, a in enumerate(range(addr, addr+sz)):
-          self.memmap[a] = None
-      else:
-        for i, a in enumerate(range(addr, addr+sz)):
-          self.memmap[a] = (value >> (i*8)) & 0xFF
+    if addr.known():
+      addrv = addr.uint()
+      for i, a in enumerate(range(addrv, addrv+sz)):
+        self.memmap[a] = (value >> (i*8)).get_lsb(8)
 
   def load_word(self, addr):
     return self._load_data(addr, 4)
@@ -195,7 +210,7 @@ class ThumbInst(object):
     if (opcode >> 11) == 0:       # LSL
       self._emu = self._emu_shift_imm
       self._dreg = self.rd()
-      self._shf = lambda x, y: (x << y) & 0xFFFFFFFF
+      self._shf = lambda x, y: x << y
     elif (opcode >> 11) == 1:     # LSR
       self._emu = self._emu_shift_imm
       self._dreg = self.rd()
@@ -203,24 +218,24 @@ class ThumbInst(object):
     elif (opcode >> 11) == 2:     # ASR
       self._emu = self._emu_shift_imm
       self._dreg = self.rd()
-      self._shf = asr32
+      self._shf = emu_asr32_imm
 
     elif (opcode >> 9) == 0xC:     # Add rd, rs, rn
       self._emu = self._emu_op3
       self._dreg = self.rd()
-      self._op3 = lambda x, y: (x + y) & 0xFFFFFFFF
+      self._op3 = lambda x, y: (x + y)
     elif (opcode >> 9) == 0xD:     # Sub rd, rs, rn
       self._emu = self._emu_op3
       self._dreg = self.rd()
-      self._op3 = lambda x, y: (x - y) & 0xFFFFFFFF
+      self._op3 = lambda x, y: (x - y)
     elif (opcode >> 9) == 0xE:     # Add rd, rs, imm
       self._emu = self._emu_op2imm
       self._dreg = self.rd()
-      self._op3 = lambda x, y: (x + y) & 0xFFFFFFFF
+      self._op3 = lambda x, y: (x + y)
     elif (opcode >> 9) == 0xF:     # Sub rd, rs, imm
       self._emu = self._emu_op2imm
       self._dreg = self.rd()
-      self._op3 = lambda x, y: (x - y) & 0xFFFFFFFF
+      self._op3 = lambda x, y: (x - y)
 
     elif (opcode >> 11) == 0x4:     # MOV reg, imm8
       self._emu = self._emu_movimm8
@@ -344,15 +359,14 @@ class ThumbInst(object):
     elif (opcode >> 6) == 0x102:     # LSL rd, rs
       self._emu = self._op2bin
       self._dreg = self.rd()
-      self._op2 = lambda x, y: (x << y) & 0xFFFFFFFF
+      self._op2 = lambda x, y: (x << y)
     elif (opcode >> 6) == 0x103:     # LSR rd, rs
       self._emu = self._op2bin
       self._dreg = self.rd()
-      self._op2 = lambda x, y: (x >> y) & 0xFFFFFFFF
+      self._op2 = lambda x, y: (x >> y)
     elif (opcode >> 6) == 0x104:     # ASR rd, rs
-      self._emu = self._op2bin
+      self._emu = self._op2bin_emu_asr32_reg
       self._dreg = self.rd()
-      self._op2 = asr32
     elif (opcode >> 6) == 0x105:     # ADC rd, rs
       self._emu = self._op2unk
       self._dreg = self.rd()
@@ -360,15 +374,14 @@ class ThumbInst(object):
       self._emu = self._op2unk
       self._dreg = self.rd()
     elif (opcode >> 6) == 0x107:     # ROR rd, rs
-      self._emu = self._op2bin
+      self._emu = self._op2bin_emu_ror32_reg
       self._dreg = self.rd()
-      self._op2 = lambda x, y: ((x >> (y & 31)) | (x << (32 - (y & 31)))) & 0xFFFFFFFF
     elif (opcode >> 6) == 0x108:     # TST rd, rs
       self._emu = self._op2nop
     elif (opcode >> 6) == 0x109:     # NEG rd, rs
       self._emu = self._op2unary
       self._dreg = self.rd()
-      self._op2 = lambda x: (~x + 1) & 0xFFFFFFFF
+      self._op2 = lambda x: (~x + 1)
     elif (opcode >> 6) == 0x10A:     # CMP rd, rs
       self._emu = self._op2nop
     elif (opcode >> 6) == 0x10B:     # CMN rd, rs
@@ -380,15 +393,15 @@ class ThumbInst(object):
     elif (opcode >> 6) == 0x10D:     # MUL rd, rs
       self._emu = self._op2bin
       self._dreg = self.rd()
-      self._op2 = lambda x, y: (x * y) & 0xFFFFFFFF
+      self._op2 = lambda x, y: (x * y)
     elif (opcode >> 6) == 0x10E:     # BIC rd, rs
       self._emu = self._op2bin
       self._dreg = self.rd()
-      self._op2 = lambda x, y: (x & (~y)) & 0xFFFFFFFF
+      self._op2 = lambda x, y: (x & (~y))
     elif (opcode >> 6) == 0x10F:     # MVN rd, rs
       self._emu = self._op2unary
       self._dreg = self.rd()
-      self._op2 = lambda x: (~x) & 0xFFFFFFFF
+      self._op2 = lambda x: (~x)
 
     elif (opcode >> 9) == 0x5A:     # PUSH reglist [+lr]
       self._emu = self._push_regs
@@ -422,6 +435,7 @@ class ThumbInst(object):
       self._emu = self._badinst
 
   def execute(self, cpustate):
+    # print(hex(self._pc))
     return self._emu(cpustate)
 
   def write_reg(self):
@@ -475,38 +489,32 @@ class ThumbInst(object):
 
   # Callbacks
   def _load_word(self, st, addr):
-    ret = None if addr is None else st.load_word(addr)
+    ret = st.load_word(addr)
     if self._executor._user_load_cb:
       self._executor._user_load_cb(32, self, addr, ret)
     return ret
 
   def _load_halfword(self, st, addr):
-    ret = None if addr is None else st.load_halfword(addr)
+    ret = st.load_halfword(addr)
     if self._executor._user_load_cb:
       self._executor._user_load_cb(16, self, addr, ret)
-    return ret
+    return ret @ st._provst.from_uint(0, num_bits=16)
 
   def _load_shalfword(self, st, addr):
-    val = None if addr is None else st.load_halfword(addr)
-    if val is None:
-      return None
-    if val & 0x8000:
-      return 0xFFFF0000 | val
-    return val
+    val = st.load_halfword(addr)
+    sbit = val.get_bit(15)
+    return val.get_lsb(16) @ sbit.replicate(16)
 
   def _load_byte(self, st, addr):
-    ret = None if addr is None else st.load_byte(addr)
+    ret = st.load_byte(addr)
     if self._executor._user_load_cb:
       self._executor._user_load_cb(8, self, addr, ret)
-    return ret
+    return ret @ st._provst.from_uint(0, num_bits=24)
 
   def _load_sbyte(self, st, addr):
-    val = None if addr is None else st.load_byte(addr)
-    if val is None:
-      return None
-    if val & 0x80:
-      return 0xFFFFFF00 | val
-    return val
+    val = st.load_byte(addr)
+    sbit = val.get_bit(7)
+    return val.get_lsb(8) @ sbit.replicate(24)
 
   def _store_word(self, st, addr, value):
     if self._executor._user_store_cb:
@@ -534,7 +542,7 @@ class ThumbInst(object):
 
   def _bl_jump(self, st):
     # TODO implement this as a proper branch (ie. like cond branches)
-    st.regs[REG_LR] = (self._pc + 2) | 1
+    st.regs[REG_LR] = st._provst.from_uint((self._pc + 2) | 1)
 
     # Assume a regular call, just wipe some registers and continue
     st.regreset([0,1,2,3])
@@ -542,7 +550,7 @@ class ThumbInst(object):
   # Emulation routines!
   def _reset_bx(self, st):
     # See ARM (_bx_msr) for more info
-    if st.regs[REG_LR] == self._pc + 2:
+    if st.regs[REG_LR].known() and st.regs[REG_LR].uint() == self._pc + 2:
       st.regreset([0,1,2,3])
     else:
       self._executor.queue_startpoint(self._pc + 2)
@@ -571,43 +579,35 @@ class ThumbInst(object):
     addr = (self._pc & ~3) + self.imm8() * 4 + 4
     ret = self._loadromcb(addr)
     if self._executor._user_load_cb:
-      self._executor._user_load_cb(32, self, addr, ret)
-    st.regs[self.rd8()] = ret
+      self._executor._user_load_cb(32, self, st._provst.from_uint(addr), st._provst.from_uint(ret))
+    st.regs[self.rd8()] = st._provst.from_uint(ret) if ret is not None else st._provst.fresh_uint(32)
 
   def _emu_ld2r(self, st):
-    rb = st.regs[self.rb()]
-    ro = st.regs[self.ro()]
-    if rb is None or ro is None:
-      st.regs[self.rd()] = self._load_cb(st, None)
-    else:
-      st.regs[self.rd()] = self._load_cb(st, rb + ro)
+    st.regs[self.rd()] = self._load_cb(st, st.regs[self.rb()] + st.regs[self.ro()])
 
   def _emu_ldimm(self, st):
     rb = st.regs[self.rb()]
-    if rb is None:
-      st.regs[self.rd()] = self._load_cb(st, None)
-    else:
-      st.regs[self.rd()] = self._load_cb(st, rb + self._imm)
+    st.regs[self.rd()] = self._load_cb(st, rb + st._provst.from_uint(self._imm))
 
   def _push_regs(self, st):
-    if st.regs[REG_SP] is not None:
+    if st.regs[REG_SP].known():
       for i in range(16):
         if self._rlist & (1 << i):
-          st.regs[REG_SP] -= 4
-          addr = st.regs[REG_SP] & ~3
+          st.regs[REG_SP] = st.regs[REG_SP] + (-4)
+          addr = st.regs[REG_SP] & st._provst.from_uint(0xFFFFFFFC)
           self._store_word(st, addr, st.regs[i])
 
   def _pop_regs(self, st):
-    if st.regs[REG_SP] is not None:
+    if st.regs[REG_SP].known():
       for i in range(16):
         if self._rlist & (1 << i):
-          addr = st.regs[REG_SP] & ~3
+          addr = st.regs[REG_SP] & st._provst.from_uint(0xFFFFFFFC)
           st.regs[i] = self._load_word(st, addr)
-          st.regs[REG_SP] += 4
+          st.regs[REG_SP] = st.regs[REG_SP] + 4
     else:
       for i in range(16):
         if self._rlist & (1 << i):
-          st.regs[i] = None
+          st.regs[i] = st._provst.fresh_uint()
 
     # Treat Pop {PC} like a branch (ie BX)
     if self._rlist & 0x8000:
@@ -621,77 +621,40 @@ class ThumbInst(object):
     pass
 
   def _emu_ldrsp(self, st):
-    if st.regs[REG_SP] is None:
-      st.regs[self.rd8()] = None
-    else:
-      st.regs[self.rd8()] = self._load_cb(st, st.regs[REG_SP] + self._imm)
+    st.regs[self.rd8()] = self._load_cb(st, st.regs[REG_SP] + st._provst.from_uint(self._imm))
 
   def _emu_strsp(self, st):
-    if st.regs[REG_SP] is not None:
-      self._store_cb(st, st.regs[REG_SP] + self._imm, st.regs[self.rd8()])
+    self._store_cb(st, st.regs[REG_SP] + st._provst.from_uint(self._imm), st.regs[self.rd8()])
 
   def _emu_stimm(self, st):
-    rb = st.regs[self.rb()]
-    rd = st.regs[self.rd()]
-    if rb is None:
-      self._store_cb(st, None, rd)
-    else:
-      self._store_cb(st, rb + self._imm, rd)
+    self._store_cb(st, st.regs[self.rb()] + st._provst.from_uint(self._imm), st.regs[self.rd()])
 
   def _emu_st2r(self, st):
-    rb = st.regs[self.rb()]
-    ro = st.regs[self.ro()]
-    rd = st.regs[self.rd()]
-    if rb is not None and ro is not None:
-      self._store_cb(st, rb + ro, rd)
-    else:
-      self._store_cb(st, None, rd)
+    self._store_cb(st, st.regs[self.rb()] + st.regs[self.ro()], st.regs[self.rd()])
 
   def _emu_shift_imm(self, st):
-    rs = st.regs[self.rs()]
-    if rs is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._shf(rs, self.imm5())
+    st.regs[self.rd()] = self._shf(st.regs[self.rs()], self.imm5())
 
   def _emu_op3(self, st):
-    rs = st.regs[self.rs()]
-    rn = st.regs[self.rn()]
-    if rs is None or rn is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._op3(rs, rn)
+    st.regs[self.rd()] = self._op3(st.regs[self.rs()], st.regs[self.rn()])
 
   def _emu_op2imm(self, st):
-    rs = st.regs[self.rs()]
-    if rs is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._op3(rs, self.imm3())
+    st.regs[self.rd()] = self._op3(st.regs[self.rs()], st._provst.from_uint(self.imm3()))
 
   def _emu_movimm8(self, st):
-    st.regs[self.rd8()] = self.imm8()
+    st.regs[self.rd8()] = st._provst.from_uint(self.imm8())
 
   def _emu_cmpimm8(self, st):
     pass
 
   def _emu_addimm8(self, st):
-    rs = st.regs[self.rd8()]
-    if rs is not None:
-      st.regs[self.rd8()] = (rs + self.imm8()) & 0xFFFFFFFF
+    st.regs[self.rd8()] = st.regs[self.rd8()] + st._provst.from_uint(self.imm8())
 
   def _emu_subimm8(self, st):
-    rs = st.regs[self.rd8()]
-    if rs is not None:
-      st.regs[self.rd8()] = (rs - self.imm8()) & 0xFFFFFFFF
+    st.regs[self.rd8()] = st.regs[self.rd8()] - st._provst.from_uint(self.imm8())
 
   def _emu_addhi(self, st):
-    ra = st.regs[self.rshi()]
-    rb = st.regs[self.rdhi()]
-    if ra is None or rb is None:
-      st.regs[self.rdhi()] = None
-    else:
-      st.regs[self.rdhi()] = (ra + rb) & 0xFFFFFFFF
+    st.regs[self.rdhi()] = st.regs[self.rshi()] + st.regs[self.rdhi()]
 
   def _emu_cmphi(self, st):
     pass
@@ -700,39 +663,43 @@ class ThumbInst(object):
     st.regs[self.rdhi()] = st.regs[self.rshi()]
 
   def _emu_addpc(self, st):
-    st.regs[self.rd8()] = ((self._pc & ~3) + 4 + self.imm8() * 4) & 0xFFFFFFFF
+    st.regs[self.rd8()] = st._provst.from_uint(((self._pc & ~3) + 4 + self.imm8() * 4) & 0xFFFFFFFF)
 
   def _emu_addsp(self, st):
-    if st.regs[REG_SP] is None:
-      st.regs[self.rd8()] = None
-    else:
-      st.regs[self.rd8()] = (st.regs[REG_SP] + self.imm8() * 4) & 0xFFFFFFFF
+    st.regs[self.rd8()] = st.regs[REG_SP] + st._provst.from_uint(self.imm8() * 4)
 
   def _emu_adjsp(self, st):
-    if st.regs[REG_SP] is not None:
-      st.regs[REG_SP] = (st.regs[REG_SP] + self.imm71() * 4) & 0xFFFFFFFF
+    st.regs[REG_SP] = st.regs[REG_SP] + st._provst.from_uint(self.imm71() * 4)
 
   def _op2nop(self, st):
     pass
 
   def _op2unk(self, st):
-    st.regs[self.rd()] = None
+    st.regs[self.rd()] = st._provst.fresh_uint()
 
   def _op2bin(self, st):
-    rs = st.regs[self.rs()]
-    rd = st.regs[self.rd()]
-    if rs is None or rd is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._op2(rs, rd)
+    st.regs[self.rd()] = self._op2(st.regs[self.rd()], st.regs[self.rs()])
 
   def _op2unary(self, st):
-    rs = st.regs[self.rs()]
-    if rs is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._op2(rs)
+    st.regs[self.rd()] = self._op2(st.regs[self.rs()])
 
+  def _op2bin_emu_asr32_reg(self, st):
+    val, amount = st.regs[self.rd()], st.regs[self.rs()]
+    sa = amount.get_lsb(8)
+    if sa.known():
+      st.regs[self.rd()] = emu_asr32_imm(val, sa.uint())
+    else:
+      st.regs[self.rd()] = st._provst.fresh_uint()
+
+  def _op2bin_emu_ror32_reg(self, st):
+    val, amount = st.regs[self.rd()], st.regs[self.rs()]
+    sa = amount.get_lsb(8)
+    if sa.known():
+      part1 = val >> (sa.uint() & 31)
+      part2 = val << (32 - (sa.uint() & 31))
+      st.regs[self.rd()] = part1 | part2
+    else:
+      st.regs[self.rd()] = st._provst.fresh_uint()
 
 class ARMInst(object):
   def __init__(self, executor, pc, opcode, romcb):
@@ -1108,7 +1075,7 @@ class ARMInst(object):
     return self._pc
 
   def execute(self, cpustate):
-    cpustate.regs[REG_PC] = self._pc  # Set PC value since ARM can easily read it
+    cpustate.regs[REG_PC] = cpustate._provst.from_uint(self._pc)  # Set PC value since ARM can easily read it
     return self._emu(cpustate)
 
   def _badinst(self, st):
@@ -1135,86 +1102,71 @@ class ARMInst(object):
     return st.store_byte(addr, value)
 
   def _load_word(self, st, addr):
-    if addr >= 0x08000000 and addr < 0x0E000000:
-      return self._loadromcb(addr)
+    if addr.known():
+      addrv = addr.uint()
+      if addrv >= 0x08000000 and addrv < 0x0E000000:
+        ret = self._loadromcb(addrv)
+        return st._provst.from_uint(ret) if ret is not None else st._provst.fresh_uint(32)
     return st.load_word(addr)
 
   def _load_halfword(self, st, addr):
-    if addr >= 0x08000000 and addr < 0x0E000000:
-      v = self._loadromcb(addr)
-      if v is not None:
-        return v & 0xFFFF
-      return None
-    return st.load_halfword(addr)
+    if addr.known():
+      addrv = addr.uint()
+      if addrv >= 0x08000000 and addrv < 0x0E000000:
+        ret = self._loadromcb(addrv)
+        ret = st._provst.from_uint(ret) if ret is not None else st._provst.fresh_uint()
+        return ret & st._provst.from_uint(0xFFFF)
+    return st.load_halfword(addr) @ st._provst.from_uint(0, num_bits=16)
 
   def _load_shalfword(self, st, addr):
     v = self._load_halfword(st, addr)
-    if v is not None:
-      if v & 0x8000:
-        v |= 0xFFFF0000
-    return v
+    sbit = v.get_bit(15)
+    return v.get_lsb(16) @ sbit.replicate(16)
 
   def _load_byte(self, st, addr):
-    if addr >= 0x08000000 and addr < 0x0E000000:
-      v = self._loadromcb(addr)
-      if v is not None:
-        return v & 0xFF
-      return None
-    return st.load_byte(addr)
+    if addr.known():
+      addrv = addr.uint()
+      if addrv >= 0x08000000 and addrv < 0x0E000000:
+        ret = self._loadromcb(addrv)
+        ret = st._provst.from_uint(ret) if ret is not None else st._provst.fresh_uint()
+        return ret & st._provst.from_uint(0xFF)
+    return st.load_byte(addr) @ st._provst.from_uint(0, num_bits=24)
 
   def _load_sbyte(self, st, addr):
     v = self._load_byte(st, addr)
-    if v is not None:
-      if v & 0x80:
-        v |= 0xFFFFFF00
-    return v
+    sbit = v.get_bit(7)
+    return v.get_lsb(8) @ sbit.replicate(24)
 
   def _emu_ld(self, st):
-    if st.regs[self.rn()] is None:
-      st.regs[self.rd()] = None
-      return
-
     # Calculate effective addr first
     addr = st.regs[self.rn()]
-    if self.rn() == REG_PC: addr += 8
+    if self.rn() == REG_PC:
+      addr = addr + 8
 
     if self._mem_bt in [MEM_IDX_PRE, MEM_IDX_PRE_WB]:
-      off = self._mem_op2(st.regs)
-      if off is None:
-        st.regs[self.rd()] = None
-        return
-      addr = (addr + off) & 0xFFFFFFFF
+      off = self._mem_op2(st)
+      addr = addr + off
 
     st.regs[self.rd()] = self._memop(st, addr)
 
     if self._mem_bt == MEM_IDX_POST_WB:
-      off = self._mem_op2(st.regs)
-      if off is None:
-        st.regs[self.rn()] = None
-      else:
-        st.regs[self.rn()] = (addr + off) & 0xFFFFFFFF
+      off = self._mem_op2(st)
+      st.regs[self.rn()] = addr + off
 
   def _emu_st(self, st):
-    if st.regs[self.rn()] is None:
-      return
-
     # Calculate effective addr first
     addr = st.regs[self.rn()]
-    if self.rn() == REG_PC: addr += 8
+    if self.rn() == REG_PC:
+      addr = addr + 8
     if self._mem_bt in [MEM_IDX_PRE, MEM_IDX_PRE_WB]:
-      off = self._mem_op2(st.regs)
-      if off is None:
-        return
-      addr = (addr + off) & 0xFFFFFFFF
+      off = self._mem_op2(st)
+      addr = addr + off
 
     self._memop(st, addr, st.regs[self.rd()])
 
     if self._mem_bt == MEM_IDX_POST_WB:
-      off = self._mem_op2(st.regs)
-      if off is None:
-        st.regs[self.rn()] = None
-      else:
-        st.regs[self.rn()] = (addr + off) & 0xFFFFFFFF
+      off = self._mem_op2(st)
+      st.regs[self.rn()] = addr + off
 
   def _emuld_sbyte(self, st):
     self._memop = self._load_sbyte
@@ -1239,16 +1191,12 @@ class ARMInst(object):
   def _emu_ldm(self, st):
     rl = self._rlist()
     nel = rl.bit_count()
-    if st.regs[self.rn()] is None:
-      for i in range(16):
-        if rl & (1 << i):
-          st.regs[i] = None
-    elif self.rn() == REG_PC:
+    if self.rn() == REG_PC:
       return self._badinst(st)   # 99.99% of the time this is a bad inst
     else:
       base = st.regs[self.rn()]
       aof = 4 if (self._mmode == MEM_POST_INC or self._mmode == MEM_PRE_INC) else -4
-      endaddr = base + nel * aof
+      endaddr = base + (nel * aof)
 
       amap = {
         MEM_PRE_INC:  base + 4,
@@ -1256,12 +1204,12 @@ class ARMInst(object):
         MEM_PRE_DEC:  endaddr,
         MEM_POST_DEC: endaddr + 4,
       }
-      address = amap[self._mmode] & 0xFFFFFFFC
+      address = amap[self._mmode] & st._provst.from_uint(0xFFFFFFFC)
 
       for i in range(16):
         if rl & (1 << i):
           st.regs[i] = self._load_word(st, address)
-          address += 4
+          address = address + st._provst.from_uint(4)
 
       if self._wb:
         st.regs[self.rn()] = endaddr
@@ -1277,10 +1225,10 @@ class ARMInst(object):
 
     if self.rn() == REG_PC:
       return self._badinst(st)
-    elif st.regs[self.rn()] is not None:
+    else:
       base = st.regs[self.rn()]
       aof = 4 if (self._mmode == MEM_POST_INC or self._mmode == MEM_PRE_INC) else -4
-      endaddr = base + nel * aof
+      endaddr = base + (nel * aof)
 
       amap = {
         MEM_PRE_INC:  base + 4,
@@ -1288,62 +1236,64 @@ class ARMInst(object):
         MEM_PRE_DEC:  endaddr,
         MEM_POST_DEC: endaddr + 4,
       }
-      address = amap[self._mmode] & 0xFFFFFFFC
+      address = amap[self._mmode] & st._provst.from_uint(0xFFFFFFFC)
 
       for i in range(16):
         if rl & (1 << i):
           self._store_word(st, address, st.regs[i])
-          address += 4
+          address = address + st._provst.from_uint(4)
 
       if self._wb:
         st.regs[self.rn()] = endaddr
 
   # Calculate operand2 with reg mode
-  def _calc_op2_reg(self, regs):
-    rm = regs[self.rm()]
-    if rm is None:
-      return None    # Not 100% accurate in some cases (like LSR#0)
+  def _calc_op2_reg(self, regs, st):
+    if not regs[self.rm()].known():
+      return st._provst.fresh_uint()  # Not 100% accurate in some cases (like LSR#0)
+    rm = regs[self.rm()].uint()
 
     t = (self._opcode >> 5) & 3
     if (self._opcode & 0x10) != 0:
       # Reg with reg shift/rot
       if self.rm() == REG_PC: rm += 12
-      rs = regs[self.rs()]
-      if rs is None:
-        return None
-      rs = rs & 0xFF   #  Limit to LSB
+      sa = regs[self.rs()].get_lsb(8)  # Only care about the 8 LSB
+      if not sa.known():
+        return st._provst.fresh_uint()
+
+      rs = sa.uint()
       if self.rs() == REG_PC: rs += 12
 
       if t == 0:
-        return (rm << rs) & 0xFFFFFFFF
+        return st._provst.from_uint((rm << rs) & 0xFFFFFFFF)
       elif t == 1:
-        return (rm >> rs) & 0xFFFFFFFF
+        return st._provst.from_uint((rm >> rs) & 0xFFFFFFFF)
       elif t == 2:
-        return asr32(rm, rs)
+        return st._provst.from_uint(asr32(rm, rs))
       else:
         amount = rs & 31
-        return ((rm >> amount) | (rm << (32 - amount))) & 0xFFFFFFFF
+        return st._provst.from_uint(((rm >> amount) | (rm << (32 - amount))) & 0xFFFFFFFF)
     else:
       # Reg with imm shift/rot
       if self.rm() == REG_PC: rm += 8
       imm = (self._opcode >> 7) & 0x1f
       if t == 0:
-        return (rm << imm) & 0xFFFFFFFF
+        return st._provst.from_uint((rm << imm) & 0xFFFFFFFF)
       elif t == 1:
         if imm:
-          return rm >> imm
+          return st._provst.from_uint(rm >> imm)
         else:
-          return 0
+          return st._provst.from_uint(0)
       elif t == 2:
         if imm:
-          return asr32(rm, imm)
+          return st._provst.from_uint(asr32(rm, imm))
         else:
-          return asr32(rm, 32)
+          return st._provst.from_uint(asr32(rm, 32))
       else:
         if imm:
-          return ((rm >> imm) | (rm << (32 - imm))) & 0xFFFFFFFF
+          return st._provst.from_uint(((rm >> imm) | (rm << (32 - imm))) & 0xFFFFFFFF)
         else:
-          return None    # RRX needs C flag input
+          # Bit 31 is unkown (TODO implement flags)
+          return st._provst.from_uint(rm >> 1, num_bits=31) @ st._provst.fresh_uint(num_bits=1)
 
   def br_offset(self):
     v = self._opcode & 0xFFFFFF
@@ -1352,10 +1302,10 @@ class ARMInst(object):
     else:
       return v << 2
 
-  def _calc_op2_imm(self):
+  def _calc_op2_imm(self, st):
     sa = self.rot4() * 2;
     imm = self.imm8()
-    return ((imm >> sa) | (imm << (32 - sa))) & 0xFFFFFFFF
+    return st._provst.from_uint(((imm >> sa) | (imm << (32 - sa))) & 0xFFFFFFFF)
 
   def rot4(self):
     return (self._opcode >> 8) & 0xF
@@ -1381,77 +1331,71 @@ class ARMInst(object):
   def op2smode(self):
     return (self._opcode >> 5) & 0x3;
 
-  def op2shimm(self, regs):
-    rmval = regs[self.rm()]
-    if rmval is None:
-      return None    # Not 100% accurate in some cases (like LSR#0)
+  def op2shimm(self, regs, st):
+    if not regs[self.rm()].known():
+      return st._provst.fresh_uint()  # Not 100% accurate in some cases (like LSR#0)
+
+    rmval = regs[self.rm()].uint()
     if self.rm() == REG_PC: rmval += 8
 
     imm = self.op2sa();      # Shift amount [0..31]
     subop = self.op2smode()
     if subop == 0:
-      return rmval << imm
+      return st._provst.from_uint((rmval << imm) & 0xFFFFFFFF)
     elif subop == 1:
       if imm:
-        return rmval >> imm
-      return 0
+        return st._provst.from_uint(rmval >> imm)
+      return st._provst.from_uint(0)
     elif subop == 2:
-      return asr32(rmval, imm if imm else 31)
+      return st._provst.from_uint(asr32(rmval, imm if imm else 31))
     else:
       if imm:
-        return ((rmval >> imm) | (rmval << (32 - imm))) & 0xFFFFFFFF
-      return None  # Unkown C flag value
+        return st._provst.from_uint(((rmval >> imm) | (rmval << (32 - imm))) & 0xFFFFFFFF)
+      # Bit 31 is unkown (TODO implement flags)
+      return st._provst.from_uint(rmval >> 1, num_bits=31) @ st._provst.fresh_uint(num_bits=1)
+
 
   # Mem operands
-  def _pimm12(self, _):
-    return self._opcode & 0xFFF
+  def _pimm12(self, st):
+    return st._provst.from_uint(self._opcode & 0xFFF)
 
-  def _mimm12(self, _):
-    return (~self._pimm12(None) + 1) & 0xFFFFFFFF
+  def _mimm12(self, st):
+    return ~self._pimm12(st) + 1
 
-  def _pregop(self, regs):
-    return self.op2shimm(regs)
+  def _pregop(self, st):
+    return self.op2shimm(st.regs, st)
 
-  def _mregop(self, regs):
-    v = self.op2shimm(regs)
-    if v is None:
-      return None
-    return (~v + 1) & 0xFFFFFFFF
+  def _mregop(self, st):
+    v = self.op2shimm(st.regs, st)
+    return ~v + 1
 
-  def _pregm(self, regs):
-    rmval = regs[self.rm()]
-    if rmval is None:
-      return None
-    if self.rm() == REG_PC: rmval += 8
+  def _pregm(self, st):
+    rmval = st.regs[self.rm()]
+    if self.rm() == REG_PC:
+      rmval = rmval + 8
     return rmval
 
-  def _mregm(self, regs):
-    v = self._pregm(regs)
-    if v is None:
-      return None
-    return (~v + 1) & 0xFFFFFFFF
+  def _mregm(self, st):
+    return (~self._pregm(st)) + 1
 
-  def _pimm8(self, _):
-    return ((self._opcode >> 4) & 0xF0) | (self._opcode & 0x0F)
+  def _pimm8(self, st):
+    return st._provst.from_uint(((self._opcode >> 4) & 0xF0) | (self._opcode & 0x0F))
 
-  def _mimm8(self, _):
-    v = self._pimm8(None)
-    return (~v + 1) & 0xFFFFFFFF
+  def _mimm8(self, st):
+    v = self._pimm8(st)
+    return ~v + 1
 
   def _rlist(self):
     return self._opcode & 0xFFFF
 
   # ALU ops such as "OP rd, rn, rm (lsl/lsr/asr/ror) #imm/rn"
   def _regop(self, st):
-    val2 = self._calc_op2_reg(st.regs)
+    val2 = self._calc_op2_reg(st.regs, st)
     val1 = st.regs[self.rn()]
-    if self.rn() == REG_PC and val1 is not None:
-      val1 += 12 if self._complex_shift() else 8   # Adjust PC value
+    if self.rn() == REG_PC:
+      val1 = val1 + (12 if self._complex_shift() else 8)   # Adjust PC value
 
-    if val1 is None or val2 is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._op(val1, val2)
+    st.regs[self.rd()] = self._op(val1, val2)
 
     if self.rd() == REG_PC:
       # Treat as a branch!
@@ -1460,19 +1404,14 @@ class ARMInst(object):
 
   def _immop(self, st):
     val1 = st.regs[self.rn()]
-    if val1 is None:
-      st.regs[self.rd()] = None
-    else:
-      if self.rn() == REG_PC: val1 += 8
-      val2 = self._calc_op2_imm()
-      st.regs[self.rd()] = self._op(val1, val2)
+    if self.rn() == REG_PC:
+      val1 = val1 + 8
+    val2 = self._calc_op2_imm(st)
+    st.regs[self.rd()] = self._op(val1, val2)
 
   def _regop_unary(self, st):
-    val2 = self._calc_op2_reg(st.regs)
-    if val2 is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = self._op(val2) & 0xFFFFFFFF
+    val2 = self._calc_op2_reg(st.regs, st)
+    st.regs[self.rd()] = self._op(val2)
 
     if self.rd() == REG_PC:
       # Treat as a branch!
@@ -1480,17 +1419,17 @@ class ARMInst(object):
       return True
 
   def _immop_unary(self, st):
-    val2 = self._calc_op2_imm()
-    st.regs[self.rd()] = self._op(val2) & 0xFFFFFFFF
+    val2 = self._calc_op2_imm(st)
+    st.regs[self.rd()] = self._op(val2)
 
   def _regop_mrs(self, st):
-    st.regs[self.rd()] = None
+    st.regs[self.rd()] = st._provst.fresh_uint()
 
   def _regop_mrs_spsr(self, st):
-    st.regs[self.rd()] = None
+    st.regs[self.rd()] = st._provst.fresh_uint()
 
   def _regop_unk(self, st):
-    st.regs[self.rd()] = None
+    st.regs[self.rd()] = st._provst.fresh_uint()
 
   def _msr_imm(self, st):
     if (self._opcode & 0x0000F000) != 0x0000F000:
@@ -1523,7 +1462,7 @@ class ARMInst(object):
       #  MOV LR, PC
       #  BX rX
       # If we detect that LR points to the next instruction we treat as a BL.
-      if st.regs[REG_LR] == self._pc + 4:
+      if st.regs[REG_LR].known() and st.regs[REG_LR].uint() == self._pc + 4:
         st.regreset([0,1,2,3])
       else:
         st.snapshot_reset(self._pc + 4)
@@ -1535,21 +1474,10 @@ class ARMInst(object):
     return (self._opcode & 0x10) != 0
 
   def _mulop32(self, st):
-    opA = st.regs[self.rm()]
-    opB = st.regs[self.rs()]
-    if opA is None or opB is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = (opA * opB) & 0xFFFFFFFF
+    st.regs[self.rd()] = st.regs[self.rm()] * st.regs[self.rs()]
 
   def _mlaop32(self, st):
-    opA = st.regs[self.rm()]
-    opB = st.regs[self.rs()]
-    opC = st.regs[self.rd()]
-    if opA is None or opB is None or opC is None:
-      st.regs[self.rd()] = None
-    else:
-      st.regs[self.rd()] = (opC + (opA * opB)) & 0xFFFFFFFF
+    st.regs[self.rd()] = (st.regs[self.rd()] + (st.regs[self.rm()] * st.regs[self.rs()]))
 
   def _mulop64u(self, st):
     pass # TODO

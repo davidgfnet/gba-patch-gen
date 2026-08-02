@@ -6,24 +6,25 @@
 import os, sys, multiprocessing, tqdm, json
 import patchtool.layout
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      if os.path.getsize(f) > 4*1024*1024:
-        flist.append(f)
-
 def wrapper(f):
   finfo = {
     "filename": os.path.basename(f),
   }
   return finfo | patchtool.layout.process_rom(open(f, "rb").read())
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  findings = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
+if __name__ == "__main__":
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        if os.path.getsize(f) > 4*1024*1024:
+          flist.append(f)
 
-findings = sorted(findings, key=lambda x:x["filename"])
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    findings = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
-print(json.dumps(findings, indent=2, sort_keys=True))
+  findings = sorted(findings, key=lambda x:x["filename"])
+
+  print(json.dumps(findings, indent=2, sort_keys=True))
 

@@ -3,7 +3,7 @@
 
 # Copyright 2025 David Guillen Fandos <david@davidgf.net>
 
-import os, sys, multiprocessing, tqdm, json
+import os, sys, tqdm, json
 import patchtool.symmap
 
 rom_data = open(sys.argv[1], "rb").read()

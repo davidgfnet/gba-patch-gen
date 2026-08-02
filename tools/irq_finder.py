@@ -6,13 +6,6 @@
 import os, sys, multiprocessing, tqdm, json
 import patchtool.irq
 
-flist = []
-for root, dirs, files in os.walk(sys.argv[1], topdown=False):
-  for name in files:
-    f = os.path.join(root, name)
-    if f.endswith(".gba"):
-      flist.append(f)
-
 def wrapper(f):
   ret = patchtool.irq.process_rom(open(f, "rb").read())
   if ret is None:
@@ -23,11 +16,19 @@ def wrapper(f):
   }
   return finfo | ret
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-  results = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
+if __name__ == "__main__":
+  flist = []
+  for root, dirs, files in os.walk(sys.argv[1], topdown=False):
+    for name in files:
+      f = os.path.join(root, name)
+      if f.endswith(".gba"):
+        flist.append(f)
 
-results = filter(lambda x: x, results)
-results = sorted(results, key=lambda x:x["filename"])
+  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    results = list(tqdm.tqdm(p.imap(wrapper, flist), total=len(flist)))
 
-print(json.dumps(results, indent=2, sort_keys=True))
+  results = filter(lambda x: x, results)
+  results = sorted(results, key=lambda x:x["filename"])
+
+  print(json.dumps(results, indent=2, sort_keys=True))
 
