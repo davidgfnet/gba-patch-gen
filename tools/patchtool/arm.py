@@ -8,7 +8,7 @@
 # registers and memory. Doesn't support flag calculation nor branch/flow insts
 # (at least properly).
 
-import copy, heapq
+import heapq
 
 def asr32(val, amount):
   if amount == 0:
@@ -52,12 +52,14 @@ class InstExecutor(object):
   def __init__(self, initial_state, store_cb=None, load_cb=None):
     self._init_state = initial_state
     self._insts = []
+    self._insts_pcmap = {}
     self._exec_queue = []
     self._entry_queue = [0]
     self._user_store_cb = store_cb
     self._user_load_cb = load_cb
 
   def addinst(self, inst):
+    self._insts_pcmap[inst._pc] = len(self._insts)
     self._insts.append(inst)
     self._start_pc = self._insts[0]._pc
     self._end_pc   = self._insts[-1]._pc
@@ -85,23 +87,21 @@ class InstExecutor(object):
         while self._entry_queue and self._entry_queue[0] == off:
           heapq.heappop(self._entry_queue)
 
-        self._exec_queue.append((off, copy.deepcopy(self._init_state)))
+        self._exec_queue.append((off, self._init_state.copy()))
 
   def queue_execution(self, start_pc, state):
     # It might be that the PC is out of range
-    for i in range(0, len(self._insts)):
-      if self._insts[i]._pc == start_pc:
-        self._exec_queue.append((i, copy.deepcopy(state)))
-        return True
+    if start_pc in self._insts_pcmap:
+      self._exec_queue.append((self._insts_pcmap[start_pc], state.copy()))
+      return True
     return False
 
   # Queues a new starting point (with initial state) at a certain PC
   def queue_startpoint(self, start_pc):
     # It might be that the PC is out of range
-    for i in range(0, len(self._insts)):
-      if self._insts[i]._pc == start_pc:
-        heapq.heappush(self._entry_queue, i)
-        return True
+    if start_pc in self._insts_pcmap:
+      heapq.heappush(self._entry_queue, self._insts_pcmap[start_pc])
+      return True
     return False
 
 # Holds CPU state as well as some limited memory state (ie. stack pushes)
@@ -116,14 +116,25 @@ class CPUState(object):
     self.regs = [None] * 16
     self.regs[REG_SP] = self._ispptr
 
+  def copy(self):
+    ns = CPUState.__new__(CPUState)
+    ns._ispptr = self._ispptr
+    ns.regs = self.regs[:]
+    ns.memmap = dict(self.memmap)
+    ns._branch_state = {
+      pc: {"regs": e["regs"][:], "memm": dict(e["memm"])}
+      for pc, e in self._branch_state.items()
+    }
+    return ns
+
   def regreset(self, rl):
     for rn in rl:
       self.regs[rn] = None
 
   def snapshot_branch(self, target_pc):
     self._branch_state[target_pc] = {
-      "regs": copy.deepcopy(self.regs),
-      "memm": copy.deepcopy(self.memmap),
+      "regs": self.regs[:],
+      "memm": dict(self.memmap),
     }
 
   def snapshot_reset(self, next_pc):
