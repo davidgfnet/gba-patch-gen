@@ -17,7 +17,7 @@ var pyodide = null;
 async function main() {
   async function loadpy() {
     pyodide = await loadPyodide();
-    let response = await fetch("../py/patchtool-0.2.2-py3-none-any.whl");
+    let response = await fetch("../py/patchtool-0.3.0-py3-none-any.whl");
     var buf = await response.arrayBuffer();
     await pyodide.unpackArchive(buf, "wheel");
     pyodide.pyimport("patchtool");
@@ -29,25 +29,38 @@ async function main() {
                   "save": "Save game", "layout": "ROM Layout", "rtc": "RTC emulation",
                   "symmap": "Symbol Map"};
   var patchmap = {};
+  var statusmap = {};
   var nump = 0;
 
   function render_status() {
     var ret = "";
-    for (var t in patchmap) {
-      if (patchmap[t]["result"] == "err")
+    for (const t of ptypes) {
+      const p = patchmap[t];
+      if (p && p["result"] == "err") {
         ret += "<div> &#x274C; " + pnames[t] + " patches</div>";
-      else {
-        var einfo = (patchmap[t]["data"] == null) ? "[No patches]" : "";
+      } else if (p) {
+        const einfo = (p["data"] == null) ? "[No patches]" : "";
         ret += "<div> &#x2705; " + pnames[t] + " patches " + einfo + "</div>";
+      } else if (typeof statusmap[t] === "number") {
+        const pct = Math.round(statusmap[t] * 100);
+        ret += "<div> &#x231B; " + pnames[t] + " patches [" + pct + "%]</div>";
+      } else {
+        ret += "<div> &#x231B; " + pnames[t] + " patches ...</div>";
       }
     }
     return ret;
   }
 
   var patch_ret = async function (event) {
+    // It could be a progress update (not a completion)
+    if ("progress" in event.data) {
+      statusmap[event.data.type] = event.data.progress;
+      document.getElementById("status").innerHTML = render_status();
+      return;
+    }
+
     var r = JSON.parse(event.data.result);
     patchmap[event.data.type] = r;
-
     if (r["result"] == "err")
       console.log(r);
 
@@ -102,8 +115,6 @@ async function main() {
       }
 
       document.getElementById('downb').classList.toggle('d-none');
-    } else {
-      st += "<div>Generating patches...</div>";
     }
 
     document.getElementById("status").innerHTML = st;

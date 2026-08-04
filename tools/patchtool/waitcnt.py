@@ -138,43 +138,53 @@ def emulate_arm_insts(start, end, rom):
   return [("str%d" % ws, a - ROM_ADDR) for ws, ent in usr_data["stores"].items() for a in ent]
 
 def process_rom(rom, **kwargs):
-  targets = []
   romsize = len(rom) & ~3
+  targets1, targets2 = [], []
   for i in range(0, romsize, 4):
     v = struct.unpack("<I", rom[i:i+4])[0]
     # Checks for a wide range of constants.
     if v >= 0x04000000 and v <= 0x04000208 and (v & 1) == 0:
-      # Emulate some code before this pool constant
-      # (also a bit after, since sometimes the value is used right after!)
-      emustart_thb = max(0, i - EMU_OFFSET_THB)
-      emustart_arm = max(0, i - EMU_OFFSET_ARM)
-      emuend = min(i + EMU_OFFSET_EX, romsize)
-      # No idea what kind of code we found: assume thumb
-      for str_type, str_off in emulate_thumb_insts(emustart_thb, emuend, rom):
-        targets.append({
-          "inst-type": "%s-thumb" % str_type,
-          "inst-offset": hex(str_off),
-        })
-      # Do the same but with ARM code now
-      for str_type, str_off in emulate_arm_insts(emustart_arm, emuend, rom):
-        targets.append({
-          "inst-type": "%s-arm" % str_type,
-          "inst-offset": hex(str_off),
-        })
+      targets1.append(i)
 
     # Found a relevant arm move instruction (mov 0x04000000)
     if (v & MOVMASK) in MOVINST:
-      # Emulate some insts before and after hoping to capture a write
-      emustart = max(0, i - EMU_OFFSET // 2)
-      emuend   = max(0, i + EMU_OFFSET // 2)
-      for str_type, str_off in emulate_arm_insts(emustart, emuend, rom):
-        targets.append({
-          "inst-type": "%s-arm" % str_type,
-          "inst-offset": hex(str_off),
-        })
+      targets2.append(i)
 
-    if "progresscb" in kwargs and (i & 0xFFFF) == 0:
-      kwargs["progresscb"](i / romsize)
+  targets = []
+  for i, pc in enumerate(targets1):
+    # Emulate some code before this pool constant
+    # (also a bit after, since sometimes the value is used right after!)
+    emustart_thb = max(0, pc - EMU_OFFSET_THB)
+    emustart_arm = max(0, pc - EMU_OFFSET_ARM)
+    emuend = min(pc + EMU_OFFSET_EX, romsize)
+    # No idea what kind of code we found: assume thumb
+    for str_type, str_off in emulate_thumb_insts(emustart_thb, emuend, rom):
+      targets.append({
+        "inst-type": "%s-thumb" % str_type,
+        "inst-offset": hex(str_off),
+      })
+    # Do the same but with ARM code now
+    for str_type, str_off in emulate_arm_insts(emustart_arm, emuend, rom):
+      targets.append({
+        "inst-type": "%s-arm" % str_type,
+        "inst-offset": hex(str_off),
+      })
+
+    if "progresscb" in kwargs and (i & 0xF) == 0:
+      kwargs["progresscb"](i / (len(targets1) + len(targets2)))
+
+  for i, pc in enumerate(targets2):
+    # Emulate some insts before and after hoping to capture a write
+    emustart = max(0, pc - EMU_OFFSET // 2)
+    emuend   = max(0, pc + EMU_OFFSET // 2)
+    for str_type, str_off in emulate_arm_insts(emustart, emuend, rom):
+      targets.append({
+        "inst-type": "%s-arm" % str_type,
+        "inst-offset": hex(str_off),
+      })
+
+    if "progresscb" in kwargs and (i & 0xF) == 0:
+      kwargs["progresscb"]((i + len(targets1)) / (len(targets1) + len(targets2)))
 
   # Dedup entries (happens with ARM code)
   targets = sorted([dict(t) for t in {tuple(d.items()) for d in targets}], key=lambda x: x["inst-offset"])

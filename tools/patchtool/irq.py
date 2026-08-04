@@ -217,12 +217,13 @@ def check_patch_memclr2(rom, maxcheck=0x200):
 
 def process_rom(rom, **kwargs):
   targets = []
+  romsize = len(rom) & ~3
 
   # Look for good known clear seqs (usually at the start of the ROM)
   targets += check_patch_memclr1(rom)
   targets += check_patch_memclr2(rom)
 
-  for i in range(0, len(rom) & ~3, 4):
+  for i in range(0, romsize, 4):
     v = struct.unpack("<I", rom[i:i+4])[0]
     # Find the address constant
     if v in SUSPICIOUS_ADDRESSES:
@@ -266,7 +267,7 @@ def process_rom(rom, **kwargs):
             })
 
   # Do this as a second pass, since we prefer patching pool addresses.
-  for i in range(0, len(rom) & ~3, 4):
+  for i in range(0, romsize, 4):
     v = struct.unpack("<I", rom[i:i+4])[0]
     # Found a relevant arm move instruction (mov 0x04000000)
     if (v & MOVMASK) in MOVINST:
@@ -281,6 +282,9 @@ def process_rom(rom, **kwargs):
             "offset": hex(str_off),
             "inst-opcode": hex(opc),
           })
+
+    if "progresscb" in kwargs and (i & 0x7FFFF) == 0:
+      kwargs["progresscb"](i / romsize)
 
 
   # Dedup entries (happens with ARM code)

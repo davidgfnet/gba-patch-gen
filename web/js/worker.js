@@ -9,7 +9,7 @@ importScripts("pyodide.js");
 async function pyload() {
   // Load python interpreter and the patchtool.
   self.pyodide = await loadPyodide();
-  let response = await fetch("../py/patchtool-0.2.2-py3-none-any.whl");
+  let response = await fetch("../py/patchtool-0.3.0-py3-none-any.whl");
   var buf = await response.arrayBuffer();
   await self.pyodide.unpackArchive(buf, "wheel");
   self.pyodide.pyimport("patchtool");
@@ -26,14 +26,19 @@ self.onmessage = async function (e) {
     sym: e.data.sym,
   });
 
-  // Run the process_rom handler in the module
   var ptype = e.data.type;
+
+  globals.set('progresscb', (frac) => {
+    self.postMessage({ "type": ptype, "progress": frac });
+  });
+
+  // Run the process_rom handler in the module
   var script = `
       import io, json, traceback, patchtool.${ptype}
       rom = io.BytesIO(rom).read()   # Convert memoryview to byte string
       try:
         sym = io.BytesIO(sym).read().decode("utf-8")
-        response = {"result": "ok", "data": patchtool.${ptype}.process_rom(rom, sym=sym)}
+        response = {"result": "ok", "data": patchtool.${ptype}.process_rom(rom, sym=sym, progresscb=progresscb)}
       except Exception as e:
         response = {"result": "err", "data": str(traceback.format_exc())}
 
