@@ -104,6 +104,12 @@ def store_hook_callback(user_data, cpust, write_size, instr, address, value):
              all(abs(value16.get_bitnum(i) - value16.get_bitnum(i+1)) == 2 for i in range(2, 14))):
           sram_write_hint = True
 
+      # Similar case, but the higher bits come from masking and low are defined (usually 1)
+      if value16.op() == "or" and all(not value16.get_bit(i).known() for i in range(2, 16)):
+        if value16.get_lsb(2).known() and value16.get_lsb(2).uint() == 0x3:
+          if all(abs(value16.get_bitnum(i) - value16.get_bitnum(i+1)) == 2 for i in range(2, 14)):
+            sram_write_hint = True
+
       if not unchanged_bits and not sram_write_hint:
         user_data["stores"][write_size].append(instr.pc())
 
