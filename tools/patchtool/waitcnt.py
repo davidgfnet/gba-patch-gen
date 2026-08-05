@@ -87,10 +87,24 @@ def store_hook_callback(user_data, cpust, write_size, instr, address, value):
 
       # Using provenance we check the bits we care about, any other writes are usually fine.
       # Bits [2-10] (ROM access time) as well as bit 14 (prefetch) are important to us.
+      value16 = value.get_lsb(16)
       mask = cpust.provenance().from_uint(0x47FC, 16)
-      new_value = value.get_lsb(16) & mask
+      new_value = value16 & mask
       old_prov = cpust.provenance().mem_init_val(TGT_ADDR, num_bits=16) & mask
-      if new_value != old_prov:
+      unchanged_bits = (new_value == old_prov)
+      sram_write_hint = False
+
+      # Some code does update the lower 2 bits (SRAM) but the value is not harcoded to 0x3
+      # Instead it comes from a flash parameter (only 2 bits), yet stored as uint16.
+      # Use a hint: if the two LSB are consecutive, and the upper 14 are too, but the two
+      # groups are not related and yet they come from an "OR", it might be the case.
+      if value16.op() == "or" and all(not value16.get_bit(i).known() for i in range(16)):
+        if ((abs(value16.get_bitnum(0) - value16.get_bitnum(1)) == 2) and
+            (abs(value16.get_bitnum(1) - value16.get_bitnum(2)) > 2) and
+             all(abs(value16.get_bitnum(i) - value16.get_bitnum(i+1)) == 2 for i in range(2, 14))):
+          sram_write_hint = True
+
+      if not unchanged_bits and not sram_write_hint:
         user_data["stores"][write_size].append(instr.pc())
 
 # Emulates a thumb code chunk and tries to find STR instructions
