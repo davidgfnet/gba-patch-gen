@@ -1,0 +1,52 @@
+name: GUI Windows build
+run-name: Build the batch patch GUI for Windows
+
+on:
+  push:
+    branches: ["gui"]
+    paths:
+      - "gui/**"
+      - "tools/**"
+      - ".github/workflows/build-gui.yml"
+  pull_request:
+    paths:
+      - "gui/**"
+      - "tools/**"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: slug
+        shell: bash
+        run: echo "sha8=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install pyinstaller pyside6 ./tools
+
+      - name: Build
+        working-directory: gui
+        run: pyinstaller --noconfirm app.spec
+
+      - name: Report build size
+        shell: bash
+        run: du -sh gui/dist/gba-patch-gui
+
+      - name: Upload artifact
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gba-patch-gui-win64-${{ steps.slug.outputs.sha8 }}
+          path: gui/dist/gba-patch-gui/
+
